@@ -18,6 +18,7 @@ import {
   useDashboardStatus,
 } from "@/components/dashboard/DashboardStatusProvider";
 import { DashboardProjects } from "@/components/dashboard/DashboardProjects";
+import { DashboardContainerHistory } from "@/components/dashboard/DashboardContainerHistory";
 import { MetersLayoutToggle } from "@/components/dashboard/MetersLayoutToggle";
 import {
   emptyPrefsSnapshot,
@@ -54,6 +55,13 @@ function DashboardLiveBody({ prefs }: { prefs: DashboardPrefsSnapshot }) {
     </section>
   );
 
+  const metersColumn = (
+    <div className="dashboard-meters-stack">
+      {metersPanel}
+      <DashboardContainerHistory />
+    </div>
+  );
+
   const containersPanel = (
     <section
       className="dashboard-panel dashboard-panel--containers"
@@ -76,7 +84,7 @@ function DashboardLiveBody({ prefs }: { prefs: DashboardPrefsSnapshot }) {
     return (
       <>
         {projectsPanel}
-        {metersPanel}
+        {metersColumn}
         {containersPanel}
       </>
     );
@@ -88,7 +96,7 @@ function DashboardLiveBody({ prefs }: { prefs: DashboardPrefsSnapshot }) {
         {projectsPanel}
         {containersPanel}
       </div>
-      <aside className="dashboard-meters-col">{metersPanel}</aside>
+      <aside className="dashboard-meters-col">{metersColumn}</aside>
     </div>
   );
 }

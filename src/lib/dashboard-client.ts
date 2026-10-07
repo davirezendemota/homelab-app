@@ -4,6 +4,9 @@ import { SHADCN } from "./shadcn-theme";
 let dashboardControllerCleanup = null;
 let dashboardViewActions = null;
 let dashboardMeterActions = null;
+let dashboardInteractionActions = null;
+let dashboardLifecycleActions = null;
+let dashboardLogsActions = null;
 
 export function setDashboardQuery(query) {
   dashboardViewActions?.setQuery(query);
@@ -41,6 +44,38 @@ export function toggleDashboardMetersLayout() {
 
 export function openDashboardMeterDetail(kind, label) {
   dashboardMeterActions?.openDetail(kind, label);
+}
+
+export function toggleDashboardHiddenStack(stackName) {
+  dashboardInteractionActions?.toggleHiddenStack(stackName);
+}
+
+export function toggleDashboardHiddenContainer(name) {
+  dashboardInteractionActions?.toggleHidden(name);
+}
+
+export function toggleDashboardFavorite(name) {
+  dashboardInteractionActions?.toggleFavorite(name);
+}
+
+export function toggleDashboardStackCollapsed(stackId) {
+  dashboardInteractionActions?.toggleStackCollapsed(stackId);
+}
+
+export function runDashboardContainerAction(id, name, action) {
+  dashboardLifecycleActions?.container(id, name, action);
+}
+
+export function runDashboardStackAction(stackName, action) {
+  dashboardLifecycleActions?.stack(stackName, action);
+}
+
+export function openDashboardLogs(id, name) {
+  dashboardLogsActions?.open(id, name);
+}
+
+export function openDashboardStackLogs(stackName) {
+  dashboardLogsActions?.openStack(stackName);
 }
 
 /** @param {import('./dashboard-bridge').DashboardBridge | undefined} bridge */
@@ -87,7 +122,65 @@ export function initDashboard(DATA, bridge) {
     };
     let logsAbort = null;
     let logsStickBottom = true;
+    let logsStackColors = false;
+    let logsStackLinePending = "";
     let copyResetTimer = null;
+
+    const STACK_LOG_PALETTE = [
+      "#79c0ff",
+      "#d2a8ff",
+      "#7ee787",
+      "#ffa657",
+      "#ff7b72",
+      "#e3b341",
+      "#f778ba",
+      "#56d4dd",
+    ];
+    const stackLogColorCache = new Map();
+
+    function stackLogColor(containerName) {
+      let color = stackLogColorCache.get(containerName);
+      if (!color) {
+        let h = 0;
+        for (let i = 0; i < containerName.length; i++) {
+          h = (h * 31 + containerName.charCodeAt(i)) | 0;
+        }
+        color = STACK_LOG_PALETTE[Math.abs(h) % STACK_LOG_PALETTE.length];
+        stackLogColorCache.set(containerName, color);
+      }
+      return color;
+    }
+
+    const STACK_LOG_LINE_RE = /^(\[([^\]]+)\])\s?(.*)$/;
+
+    function appendStackLogLine(view, line) {
+      const span = document.createElement("span");
+      span.className = "log-stack-line";
+      const match = STACK_LOG_LINE_RE.exec(line);
+      if (match) {
+        span.style.color = stackLogColor(match[2]);
+        span.textContent = match[1] + (match[3] ? " " + match[3] : "");
+      } else {
+        span.textContent = line;
+      }
+      view.appendChild(span);
+    }
+
+    function appendStackLogsChunk(view, text) {
+      logsStackLinePending += text;
+      const parts = logsStackLinePending.split("\n");
+      logsStackLinePending = parts.pop() ?? "";
+      for (const line of parts) {
+        appendStackLogLine(view, line);
+      }
+    }
+
+    function flushStackLogLinePending() {
+      if (!logsStackLinePending) return;
+      const view = document.getElementById("logs-view");
+      appendStackLogLine(view, logsStackLinePending);
+      logsStackLinePending = "";
+    }
 
     const LEGACY_KEYS = {
       favorites: "homelab-homepage-favorites",
@@ -240,11 +333,13 @@ export function initDashboard(DATA, bridge) {
     }
 
     function toggleHiddenStack(stackName) {
+      if (!stackName) return;
       if (hiddenStacks.has(stackName)) {
         hiddenStacks.delete(stackName);
       } else {
         hiddenStacks.add(stackName);
         containerNamesInStack(stackName).forEach((name) => hiddenContainers.delete(name));
+        state.showHidden = true;
       }
       saveHidden();
       if (!hiddenContainers.size && !hiddenStacks.size) state.showHidden = false;
@@ -261,10 +356,12 @@ export function initDashboard(DATA, bridge) {
         DATA.containers
           .filter((c) => c.stack === stack && c.name !== name)
           .forEach((c) => hiddenContainers.add(c.name));
+        state.showHidden = true;
       } else if (hiddenContainers.has(name)) {
         hiddenContainers.delete(name);
       } else {
         hiddenContainers.add(name);
+        state.showHidden = true;
       }
 
       saveHidden();
@@ -419,12 +516,20 @@ export function initDashboard(DATA, bridge) {
       return { color: SHADCN.mutedForeground, bg: SHADCN.mutedForegroundBg };
     }
 
-    function cpuBarColor(pct, running) {
-      if (!running || pct == null) return SHADCN.mutedForeground;
-      if (pct <= 0) return SHADCN.mutedForeground;
-      if (pct <= 50) return SHADCN.foreground;
-      if (pct <= 85) return "#e3b341";
-      return "#f85149";
+    function usageMetricBadgeStyle(pct, running) {
+      if (!running || pct == null || pct <= 0) {
+        return { color: SHADCN.mutedForeground, bg: SHADCN.mutedForegroundBg };
+      }
+      if (pct <= 50) {
+        return {
+          color: SHADCN.foreground,
+          bg: "color-mix(in oklch, var(--foreground) 10%, transparent)",
+        };
+      }
+      if (pct <= 85) {
+        return { color: "#e3b341", bg: "rgba(210,153,34,.12)" };
+      }
+      return { color: "#f85149", bg: "rgba(248,81,73,.12)" };
     }
 
     function formatPct(value) {
@@ -439,21 +544,21 @@ export function initDashboard(DATA, bridge) {
       return n.toFixed(4) + "%";
     }
 
-    function renderCpuBar(c) {
+    function renderContainerUsage(c) {
       const running = isContainerRunning(c.status);
-      const pct = running ? (c.cpuPct ?? 0) : null;
-      const color = cpuBarColor(pct, running);
-      const width = running && pct != null ? Math.min(100, Math.max(0, pct)) : 0;
-      const label = running && pct != null ? formatPct(pct) : "—";
+      const ramPct = running ? (c.memPct ?? 0) : null;
+      const cpuPct = running ? (c.cpuPct ?? 0) : null;
+      const ramLabel = running && ramPct != null ? formatPct(ramPct) : "—";
+      const cpuLabel = running && cpuPct != null ? formatPct(cpuPct) : "—";
+      const ramBadge = usageMetricBadgeStyle(ramPct, running);
+      const cpuBadge = usageMetricBadgeStyle(cpuPct, running);
       const title = running
-        ? `CPU ${formatPct(pct ?? 0)}`
+        ? `RAM ${ramLabel} · CPU ${cpuLabel}`
         : "Container parado";
       return `
-        <div class="cpu-cell" title="${esc(title)}">
-          <span class="cpu-pct" style="color:${esc(color)};">${esc(label)}</span>
-          <div class="cpu-bar">
-            <span style="width:${esc(String(width))}%;background:${esc(color)};"></span>
-          </div>
+        <div class="container-usage" title="${esc(title)}">
+          <span class="usage-badge" style="color:${esc(ramBadge.color)};background:${esc(ramBadge.bg)};">RAM <span class="usage-badge-value">${esc(ramLabel)}</span></span>
+          <span class="usage-badge" style="color:${esc(cpuBadge.color)};background:${esc(cpuBadge.bg)};">CPU <span class="usage-badge-value">${esc(cpuLabel)}</span></span>
         </div>
       `;
     }
@@ -955,6 +1060,7 @@ export function initDashboard(DATA, bridge) {
       return `
         <div class="action-group stack-actions">
           ${lifecycleBtn}
+          <button type="button" class="name-action-btn stack-action-btn" data-stack-logs="${esc(stack.name)}" title="Ver logs da stack" aria-label="Ver logs da stack ${esc(stack.name)}">${LOGS_ICON}</button>
           <button type="button" class="name-action-btn stack-action-btn" data-stack-action="restart" data-stack-name="${esc(stack.name)}" title="Reiniciar stack" aria-label="Reiniciar stack ${esc(stack.name)}">${RESTART_ICON}</button>
           <button type="button" class="name-action-btn stack-action-btn delete-btn" data-stack-action="delete" data-stack-name="${esc(stack.name)}" title="Apagar stack" aria-label="Apagar stack ${esc(stack.name)}">${TRASH_ICON}</button>
         </div>
@@ -973,7 +1079,6 @@ export function initDashboard(DATA, bridge) {
             <span class="status-dot" style="background:${c.dotColor};box-shadow:0 0 0 3px ${c.dotGlow};"></span>
             <span class="name-text" title="${esc(c.name)}">${esc(c.name)}</span>
           </div>
-          ${renderCpuBar(c)}
           <div class="image-text" title="${esc(c.image)}">${esc(c.image)}</div>
           <div class="status-cell">
             <span class="status-pill" style="color:${c.statusColor};background:${c.statusBg}">${esc(c.status)}</span>
@@ -998,6 +1103,7 @@ export function initDashboard(DATA, bridge) {
             <button type="button" class="hide-btn${hidden ? " is-on" : ""}" data-hide="${esc(c.name)}" title="${hidden ? "Mostrar container" : "Esconder container"}" aria-label="${hidden ? "Mostrar " + esc(c.name) : "Esconder " + esc(c.name)}" aria-pressed="${hidden ? "true" : "false"}">${HIDE_ICON}</button>
             <button type="button" class="logs-btn" data-logs="${esc(c.id)}" data-name="${esc(c.name)}" title="Ver logs" aria-label="Ver logs de ${esc(c.name)}">${LOGS_ICON}</button>
           </div>
+          ${renderContainerUsage(c)}
         </div>
       `;
     }
@@ -1247,7 +1353,11 @@ export function initDashboard(DATA, bridge) {
     function appendLogs(text) {
       const view = document.getElementById("logs-view");
       const scroller = document.getElementById("logs-scroll");
-      view.textContent += text;
+      if (logsStackColors) {
+        appendStackLogsChunk(view, text);
+      } else {
+        view.textContent += text;
+      }
       if (logsStickBottom) scroller.scrollTop = scroller.scrollHeight;
       updateScrollProgress();
     }
@@ -1269,12 +1379,14 @@ export function initDashboard(DATA, bridge) {
       fill.style.width = pct.toFixed(2) + "%";
     }
 
-    async function openLogs(id, name) {
+    async function streamLogsToModal(url, title, options = {}) {
       closeLogs();
       const modal = document.getElementById("logs-modal");
       const view = document.getElementById("logs-view");
       const scroller = document.getElementById("logs-scroll");
-      document.getElementById("logs-modal-title").textContent = name;
+      document.getElementById("logs-modal-title").textContent = title;
+      logsStackColors = Boolean(options.stackColors);
+      logsStackLinePending = "";
       view.textContent = "";
       logsStickBottom = true;
       document.getElementById("logs-progress").hidden = true;
@@ -1286,7 +1398,7 @@ export function initDashboard(DATA, bridge) {
       const ctrl = new AbortController();
       logsAbort = ctrl;
       try {
-        const res = await fetch("/api/logs/" + encodeURIComponent(id), {
+        const res = await fetch(url, {
           cache: "no-store",
           signal: ctrl.signal,
         });
@@ -1302,15 +1414,32 @@ export function initDashboard(DATA, bridge) {
           appendLogs(decoder.decode(value, { stream: true }));
         }
         appendLogs(decoder.decode());
+        if (logsStackColors) flushStackLogLinePending();
       } catch (e) {
         if (e && e.name === "AbortError") return;
         appendLogs("\\n[erro] " + (e && e.message ? e.message : e) + "\\n");
+        if (logsStackColors) flushStackLogLinePending();
       } finally {
         if (logsAbort === ctrl) {
           logsAbort = null;
           setLogsLive(false);
         }
       }
+    }
+
+    function openLogs(id, name) {
+      return streamLogsToModal(
+        "/api/logs/" + encodeURIComponent(id),
+        name,
+      );
+    }
+
+    function openStackLogs(stackName) {
+      return streamLogsToModal(
+        "/api/logs/stack/" + encodeURIComponent(stackName),
+        "Stack " + stackName,
+        { stackColors: true },
+      );
     }
 
     async function copyLogs() {
@@ -1344,8 +1473,9 @@ export function initDashboard(DATA, bridge) {
 
     function clearLogs() {
       const view = document.getElementById("logs-view");
-      if (!view.textContent) return;
+      if (!view.textContent && !view.childElementCount) return;
       view.textContent = "";
+      logsStackLinePending = "";
       logsStickBottom = true;
       document.getElementById("logs-progress").hidden = true;
       document.getElementById("logs-progress-bar").style.width = "0%";
@@ -1404,6 +1534,12 @@ export function initDashboard(DATA, bridge) {
 
     function showToast(message, type = "info", duration = 4500) {
       const container = document.getElementById("toast-container");
+      if (!container) {
+        return {
+          update() {},
+          remove() {},
+        };
+      }
       const toast = document.createElement("div");
       toast.className = `toast toast-${type}`;
       toast.textContent = message;
@@ -1497,6 +1633,11 @@ export function initDashboard(DATA, bridge) {
     }
 
     function handleStacksClick(e) {
+      const stackLogsBtn = e.target.closest("[data-stack-logs]");
+      if (stackLogsBtn) {
+        openStackLogs(stackLogsBtn.dataset.stackLogs);
+        return;
+      }
       const stackActionBtn = e.target.closest("[data-stack-action]");
       if (stackActionBtn) {
         stackAction(stackActionBtn.dataset.stackName, stackActionBtn.dataset.stackAction);
@@ -1532,8 +1673,27 @@ export function initDashboard(DATA, bridge) {
       openLogs(btn.dataset.logs, btn.dataset.name);
     }
 
-    document.getElementById("stacks").addEventListener("click", handleStacksClick);
-    document.getElementById("hidden-stacks").addEventListener("click", handleStacksClick);
+    const stacksEl = document.getElementById("stacks");
+    const hiddenStacksEl = document.getElementById("hidden-stacks");
+    stacksEl?.addEventListener("click", handleStacksClick);
+    hiddenStacksEl?.addEventListener("click", handleStacksClick);
+
+    dashboardInteractionActions = {
+      toggleHiddenStack,
+      toggleHidden,
+      toggleFavorite,
+      toggleStackCollapsed,
+    };
+
+    dashboardLifecycleActions = {
+      container: containerAction,
+      stack: stackAction,
+    };
+
+    dashboardLogsActions = {
+      open: openLogs,
+      openStack: openStackLogs,
+    };
 
     const fullscreenToggle = document.getElementById("fullscreen-toggle");
     if (document.fullscreenEnabled && fullscreenToggle) {
@@ -1603,8 +1763,13 @@ export function initDashboard(DATA, bridge) {
         logsAbort.abort();
         logsAbort = null;
       }
+      stacksEl?.removeEventListener("click", handleStacksClick);
+      hiddenStacksEl?.removeEventListener("click", handleStacksClick);
       dashboardViewActions = null;
       dashboardMeterActions = null;
+      dashboardInteractionActions = null;
+      dashboardLifecycleActions = null;
+      dashboardLogsActions = null;
       setVerticalMetersFn = null;
       setCompactViewFn = null;
       setTruncateNamesFn = null;

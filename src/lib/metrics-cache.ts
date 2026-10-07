@@ -5,14 +5,26 @@ import {
 } from "./config";
 import {
   attachCpuPct,
+  attachMemPct,
   containerCpuPct,
+  containerMemPctOfHost,
   containerName,
   runningContainers,
   runningContainerStats,
   type ContainerRow,
 } from "./docker";
-import { buildMeters, temperatureSensorDetails } from "./host-metrics";
+import {
+  buildMeters,
+  ramStats,
+  temperatureSensorDetails,
+} from "./host-metrics";
 import { meterDetailPayload, refreshMeterDetailCpuRam } from "./meter-details";
+import {
+  getContainerStartHistory,
+  observeContainers,
+  refreshContainerStartedAt,
+  type ContainerLifecycleEvent,
+} from "./container-start-history";
 
 export type PagePayload = {
   host: string;
@@ -21,6 +33,7 @@ export type PagePayload = {
   error: string | null;
   containers: ContainerRow[];
   meters: Record<string, unknown>[];
+  containerHistory: ContainerLifecycleEvent[];
 };
 
 class MetricsCache {
@@ -34,6 +47,7 @@ class MetricsCache {
 
   async warm(): Promise<void> {
     await this.refreshFast();
+    await refreshContainerStartedAt(this.containers);
     await this.refreshStorage();
   }
 
@@ -57,16 +71,25 @@ class MetricsCache {
       let statusError: string | null = null;
       const meterUpdates: Record<string, Record<string, unknown>> = {};
       let cpuByName: Record<string, number> = {};
+      let memByName: Record<string, number> = {};
 
       try {
         const pairs = await runningContainerStats();
         const refreshed = await refreshMeterDetailCpuRam(pairs);
         meterUpdates.cpu = refreshed.cpu;
         meterUpdates.ram = refreshed.ram;
+        const [, , ramTotalGb] = ramStats();
+        const ramTotalBytes = Math.floor(ramTotalGb * 1024 ** 3);
         cpuByName = Object.fromEntries(
           pairs.map(({ container, stats }) => [
             containerName(container),
             containerCpuPct(stats),
+          ]),
+        );
+        memByName = Object.fromEntries(
+          pairs.map(({ container, stats }) => [
+            containerName(container),
+            containerMemPctOfHost(stats, ramTotalBytes),
           ]),
         );
       } catch (exc) {
@@ -78,6 +101,7 @@ class MetricsCache {
       try {
         containers = await runningContainers();
         attachCpuPct(containers, cpuByName);
+        attachMemPct(containers, memByName);
       } catch (exc) {
         statusError = exc instanceof Error ? exc.message : String(exc);
       }
@@ -101,7 +125,10 @@ class MetricsCache {
         };
       }
 
-      if (containers != null) this.containers = containers;
+      if (containers != null) {
+        observeContainers(containers);
+        this.containers = containers;
+      }
       if (meters != null) this.meters = meters;
       if (statusError != null) {
         this.statusError = statusError;
@@ -119,6 +146,11 @@ class MetricsCache {
   }
 
   private async refreshStorage(): Promise<void> {
+    try {
+      await refreshContainerStartedAt(this.containers);
+    } catch {
+      /* ignore */
+    }
     try {
       const data = await meterDetailPayload("storage");
       const { kind: _k, ...rest } = data;
@@ -141,6 +173,7 @@ class MetricsCache {
       error: this.statusError,
       containers: structuredClone(this.containers),
       meters: structuredClone(this.meters),
+      containerHistory: getContainerStartHistory(),
     };
   }
 

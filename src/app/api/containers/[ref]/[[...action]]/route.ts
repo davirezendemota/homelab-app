@@ -1,4 +1,5 @@
 import { errorJson, jsonResponse } from "@/lib/api-utils";
+import { recordLifecycleFromRef } from "@/lib/container-start-history";
 import { containerRemove, containerStart, containerStop, containerRestart } from "@/lib/docker";
 
 export const runtime = "nodejs";
@@ -7,10 +8,14 @@ type Params = { params: Promise<{ ref: string; action?: string[] }> };
 
 async function handleAction(ref: string, action: string): Promise<Response> {
   try {
-    if (action === "start") await containerStart(ref);
-    else if (action === "stop") await containerStop(ref);
-    else if (action === "restart") await containerRestart(ref);
-    else return errorJson("Not Found", 404);
+    if (action === "start") {
+      await containerStart(ref);
+      await recordLifecycleFromRef(ref, "started");
+    } else if (action === "stop") await containerStop(ref);
+    else if (action === "restart") {
+      await containerRestart(ref);
+      await recordLifecycleFromRef(ref, "restarted");
+    } else return errorJson("Not Found", 404);
     return jsonResponse({ ok: true });
   } catch (exc) {
     const message = exc instanceof Error ? exc.message : String(exc);

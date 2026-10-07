@@ -83,6 +83,25 @@ export function cpuBarColor(pct: number | null | undefined, running: boolean) {
   return "#f85149";
 }
 
+export function usageMetricBadgeStyle(
+  pct: number | null | undefined,
+  running: boolean,
+): { color: string; bg: string } {
+  if (!running || pct == null || pct <= 0) {
+    return { color: SHADCN.mutedForeground, bg: SHADCN.mutedForegroundBg };
+  }
+  if (pct <= 50) {
+    return {
+      color: SHADCN.foreground,
+      bg: "color-mix(in oklch, var(--foreground) 10%, transparent)",
+    };
+  }
+  if (pct <= 85) {
+    return { color: "#e3b341", bg: "rgba(210,153,34,.12)" };
+  }
+  return { color: "#f85149", bg: "rgba(248,81,73,.12)" };
+}
+
 export function formatPct(value: number) {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return "0%";

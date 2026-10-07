@@ -134,6 +134,7 @@ export type ContainerRow = {
   stack: string;
   health: string | null;
   cpuPct?: number | null;
+  memPct?: number | null;
 };
 
 type DockerContainerListItem = {
@@ -343,6 +344,14 @@ export async function runningContainerStats(): Promise<
   return rows;
 }
 
+export function containerMemPctOfHost(
+  stats: ContainerStats,
+  hostRamTotalBytes: number,
+): number {
+  if (hostRamTotalBytes <= 0) return 0;
+  return (containerMemoryBytes(stats) / hostRamTotalBytes) * 100;
+}
+
 export function attachCpuPct(
   containers: ContainerRow[],
   cpuByName: Record<string, number>,
@@ -352,6 +361,19 @@ export function attachCpuPct(
       c.cpuPct = cpuByName[c.name] ?? 0;
     } else {
       c.cpuPct = null;
+    }
+  }
+}
+
+export function attachMemPct(
+  containers: ContainerRow[],
+  memByName: Record<string, number>,
+): void {
+  for (const c of containers) {
+    if (isContainerRunning(c.status)) {
+      c.memPct = memByName[c.name] ?? 0;
+    } else {
+      c.memPct = null;
     }
   }
 }

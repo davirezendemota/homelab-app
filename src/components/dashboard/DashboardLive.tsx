@@ -1,12 +1,27 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef } from "react";
+import {
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  type MouseEvent,
+} from "react";
 import { SHADCN } from "@/lib/shadcn-theme";
-import { openDashboardMeterDetail } from "@/lib/dashboard-client";
+import {
+  openDashboardLogs,
+  openDashboardStackLogs,
+  openDashboardMeterDetail,
+  runDashboardContainerAction,
+  runDashboardStackAction,
+  toggleDashboardFavorite,
+  toggleDashboardHiddenContainer,
+  toggleDashboardHiddenStack,
+  toggleDashboardStackCollapsed,
+} from "@/lib/dashboard-client";
 import type { PagePayload } from "@/lib/metrics-cache";
 import {
   buildLists,
-  cpuBarColor,
   decorate,
   formatPct,
   isContainerRunning,
@@ -14,6 +29,7 @@ import {
   isStackCollapsed,
   portHref,
   stackKey,
+  usageMetricBadgeStyle,
   type DashboardPrefsSnapshot,
   type DecoratedContainer,
   type StackBlock,
@@ -109,23 +125,55 @@ function MeterChart({
   );
 }
 
-function CpuCell({ c }: { c: DecoratedContainer }) {
+type ContainerLifecycleAction = "start" | "stop" | "restart" | "delete";
+
+function onContainerLifecycleClick(
+  e: MouseEvent,
+  id: string,
+  name: string,
+  action: ContainerLifecycleAction,
+) {
+  e.stopPropagation();
+  runDashboardContainerAction(id, name, action);
+}
+
+function onStackLifecycleClick(
+  e: MouseEvent,
+  stackName: string,
+  action: ContainerLifecycleAction,
+) {
+  e.stopPropagation();
+  runDashboardStackAction(stackName, action);
+}
+
+function ContainerUsageCell({ c }: { c: DecoratedContainer }) {
   const running = isContainerRunning(c.status);
-  const pct = running ? (c.cpuPct ?? 0) : null;
-  const color = cpuBarColor(pct, running);
-  const width =
-    running && pct != null ? Math.min(100, Math.max(0, pct)) : 0;
-  const label = running && pct != null ? formatPct(pct) : "—";
-  const title = running ? `CPU ${formatPct(pct ?? 0)}` : "Container parado";
+  const ramPct = running ? (c.memPct ?? 0) : null;
+  const cpuPct = running ? (c.cpuPct ?? 0) : null;
+  const ramLabel = running && ramPct != null ? formatPct(ramPct) : "—";
+  const cpuLabel = running && cpuPct != null ? formatPct(cpuPct) : "—";
+  const title = running
+    ? `RAM ${ramLabel} · CPU ${cpuLabel}`
+    : "Container parado";
+  const ramBadge = usageMetricBadgeStyle(ramPct, running);
+  const cpuBadge = usageMetricBadgeStyle(cpuPct, running);
 
   return (
-    <div className="cpu-cell" title={title}>
-      <span className="cpu-pct" style={{ color }}>
-        {label}
+    <div className="container-usage" title={title}>
+      <span
+        className="usage-badge"
+        style={{ color: ramBadge.color, background: ramBadge.bg }}
+      >
+        RAM{" "}
+        <span className="usage-badge-value">{ramLabel}</span>
       </span>
-      <div className="cpu-bar">
-        <span style={{ width: `${width}%`, background: color }} />
-      </div>
+      <span
+        className="usage-badge"
+        style={{ color: cpuBadge.color, background: cpuBadge.bg }}
+      >
+        CPU{" "}
+        <span className="usage-badge-value">{cpuLabel}</span>
+      </span>
     </div>
   );
 }
@@ -160,7 +208,6 @@ const ContainerRowView = memo(function ContainerRowView({
           {c.name}
         </span>
       </div>
-      <CpuCell c={c} />
       <div className="image-text" title={c.image}>
         {c.image}
       </div>
@@ -183,6 +230,7 @@ const ContainerRowView = memo(function ContainerRowView({
               data-name={c.name}
               title="Parar"
               aria-label={`Parar ${c.name}`}
+              onClick={(e) => onContainerLifecycleClick(e, c.id, c.name, "stop")}
             >
               <StopIcon />
             </button>
@@ -195,6 +243,7 @@ const ContainerRowView = memo(function ContainerRowView({
               data-name={c.name}
               title="Iniciar"
               aria-label={`Iniciar ${c.name}`}
+              onClick={(e) => onContainerLifecycleClick(e, c.id, c.name, "start")}
             >
               <PlayIcon />
             </button>
@@ -207,6 +256,9 @@ const ContainerRowView = memo(function ContainerRowView({
             data-name={c.name}
             title="Reiniciar"
             aria-label={`Reiniciar ${c.name}`}
+            onClick={(e) =>
+              onContainerLifecycleClick(e, c.id, c.name, "restart")
+            }
           >
             <RestartIcon />
           </button>
@@ -218,6 +270,7 @@ const ContainerRowView = memo(function ContainerRowView({
             data-name={c.name}
             title="Apagar"
             aria-label={`Apagar ${c.name}`}
+            onClick={(e) => onContainerLifecycleClick(e, c.id, c.name, "delete")}
           >
             <TrashIcon />
           </button>
@@ -250,6 +303,10 @@ const ContainerRowView = memo(function ContainerRowView({
             isFav ? `Remover ${c.name} dos favoritos` : `Favoritar ${c.name}`
           }
           aria-pressed={isFav}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleDashboardFavorite(c.name);
+          }}
         >
           <StarIcon />
         </button>
@@ -260,6 +317,10 @@ const ContainerRowView = memo(function ContainerRowView({
           title={hidden ? "Mostrar container" : "Esconder container"}
           aria-label={hidden ? `Mostrar ${c.name}` : `Esconder ${c.name}`}
           aria-pressed={hidden}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleDashboardHiddenContainer(c.name);
+          }}
         >
           <HideIcon />
         </button>
@@ -270,10 +331,15 @@ const ContainerRowView = memo(function ContainerRowView({
           data-name={c.name}
           title="Ver logs"
           aria-label={`Ver logs de ${c.name}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            openDashboardLogs(c.id, c.name);
+          }}
         >
           <LogsIcon />
         </button>
       </div>
+      <ContainerUsageCell c={c} />
     </div>
   );
 }, rowPropsEqual);
@@ -291,6 +357,7 @@ function rowPropsEqual(
   if (
     prev.c.status !== next.c.status ||
     prev.c.cpuPct !== next.c.cpuPct ||
+    prev.c.memPct !== next.c.memPct ||
     prev.c.image !== next.c.image ||
     prev.c.name !== next.c.name
   ) {
@@ -366,6 +433,10 @@ function StackBlockView({
                   : `Comprimir stack ${stack.name}`
               }
               aria-expanded={!collapsed}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleDashboardStackCollapsed(key);
+              }}
             >
               {collapsed ? <ChevronDownIcon /> : <ChevronUpIcon />}
             </button>
@@ -381,6 +452,10 @@ function StackBlockView({
                     : `Esconder stack ${stack.name}`
                 }
                 aria-pressed={stackHidden}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleDashboardHiddenStack(stack.name);
+                }}
               >
                 <HideIcon />
               </button>
@@ -395,6 +470,9 @@ function StackBlockView({
                     data-stack-name={stack.name}
                     title="Parar stack"
                     aria-label={`Parar stack ${stack.name}`}
+                    onClick={(e) =>
+                      onStackLifecycleClick(e, stack.name, "stop")
+                    }
                   >
                     <StopIcon />
                   </button>
@@ -402,10 +480,26 @@ function StackBlockView({
                 <button
                   type="button"
                   className="name-action-btn stack-action-btn"
+                  data-stack-logs={stack.name}
+                  title="Ver logs da stack"
+                  aria-label={`Ver logs da stack ${stack.name}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openDashboardStackLogs(stack.name);
+                  }}
+                >
+                  <LogsIcon />
+                </button>
+                <button
+                  type="button"
+                  className="name-action-btn stack-action-btn"
                   data-stack-action="restart"
                   data-stack-name={stack.name}
                   title="Reiniciar stack"
                   aria-label={`Reiniciar stack ${stack.name}`}
+                  onClick={(e) =>
+                    onStackLifecycleClick(e, stack.name, "restart")
+                  }
                 >
                   <RestartIcon />
                 </button>
@@ -416,6 +510,9 @@ function StackBlockView({
                   data-stack-name={stack.name}
                   title="Apagar stack"
                   aria-label={`Apagar stack ${stack.name}`}
+                  onClick={(e) =>
+                    onStackLifecycleClick(e, stack.name, "delete")
+                  }
                 >
                   <TrashIcon />
                 </button>

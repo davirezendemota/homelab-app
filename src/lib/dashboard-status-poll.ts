@@ -41,9 +41,26 @@ export function statusPayloadChanged(
       a.image !== b.image ||
       a.health !== b.health ||
       cpuPctChanged(a.cpuPct, b.cpuPct) ||
+      cpuPctChanged(a.memPct, b.memPct) ||
       a.stack !== b.stack ||
       a.ports.length !== b.ports.length ||
       a.ports.some((p, j) => p !== b.ports[j])
+    ) {
+      return true;
+    }
+  }
+
+  const prevHistory = prev.containerHistory ?? [];
+  const nextHistory = next.containerHistory ?? [];
+  if (prevHistory.length !== nextHistory.length) return true;
+  for (let i = 0; i < prevHistory.length; i++) {
+    const a = prevHistory[i];
+    const b = nextHistory[i];
+    if (
+      a.at !== b.at ||
+      a.name !== b.name ||
+      a.kind !== b.kind ||
+      a.stack !== b.stack
     ) {
       return true;
     }
