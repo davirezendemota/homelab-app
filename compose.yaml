@@ -11,7 +11,7 @@ services:
       - "10000:3000"
     environment:
       TZ: America/Sao_Paulo
-      LINK_HOST: homelab
+      LINK_HOST: homelab01
       ALLOWED_DEV_ORIGINS: homelab,homelab01
       DOCKER_SOCKET: /var/run/docker.sock
       HOST_ROOT: /host

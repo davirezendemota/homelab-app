@@ -37,7 +37,7 @@ docker compose -f infra/compose.production.yaml up -d --build
 
 | Variável | Padrão | Descrição |
 |----------|--------|-----------|
-| `LINK_HOST` | *(header da requisição)* | Hostname nos links das portas (`http://HOST:porta`). Use `homelab` se você abre o painel por `127.0.0.1`/`localhost`. |
+| `LINK_HOST` | *(header da requisição)* | Hostname nos links das portas (`http://HOST:porta`). No compose está `homelab01` para bater com o host na LAN; use `homelab` ou `localhost` se abrir o painel só localmente. |
 | `DOCKER_SOCKET` | `/var/run/docker.sock` | Socket da API Docker |
 | `HOST_ROOT` | `/host` | Raiz do host montada (métricas de disco/temp) |
 | `DB_PATH` | `/app/data/homepage.db` | SQLite de preferências |
