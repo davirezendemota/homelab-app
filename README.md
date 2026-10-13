@@ -4,6 +4,10 @@ Versão em [Next.js](https://nextjs.org/) do [homelab-homepage](https://github.c
 
 Mesma UI e APIs (`/api/status`, `/api/prefs`, logs, métricas, ações em containers/stacks), com backend em TypeScript (Docker via socket Unix, preferências em SQLite).
 
+![Dashboard mock (desktop 16:9)](docs/screenshots/dashboard-mock-desktop.png)
+
+Preview estático com dados fictícios (`HOMELAB_MOCK=1`): build `infra/Dockerfile.mock`, porta sugerida **10002**, screenshot com `npm run screenshot:mock`.
+
 ## Desenvolvimento local
 
 Requisitos: Node 22+, acesso ao socket Docker.
