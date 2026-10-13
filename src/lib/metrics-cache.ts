@@ -25,6 +25,8 @@ import {
   refreshContainerStartedAt,
   type ContainerLifecycleEvent,
 } from "./container-start-history";
+import { getMockMeterDetail, getMockPagePayload } from "./mock-dashboard-data";
+import { isMockMode } from "./mock-mode";
 
 export type PagePayload = {
   host: string;
@@ -205,6 +207,9 @@ function bootCache(): Promise<void> {
 }
 
 export async function getPagePayload(host: string): Promise<PagePayload> {
+  if (isMockMode()) {
+    return getMockPagePayload(host);
+  }
   await bootCache();
   return getCache().pagePayload(host);
 }
@@ -212,11 +217,17 @@ export async function getPagePayload(host: string): Promise<PagePayload> {
 export async function getMeterDetail(
   kind: string,
 ): Promise<Record<string, unknown>> {
+  if (isMockMode()) {
+    return getMockMeterDetail(kind);
+  }
   await bootCache();
   return getCache().meterDetail(kind);
 }
 
 export async function startMetricsCache(): Promise<void> {
+  if (isMockMode()) {
+    return;
+  }
   const c = getCache();
   await c.warm();
   c.start();

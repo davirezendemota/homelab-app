@@ -2,6 +2,8 @@ import fs from "fs";
 import path from "path";
 import Database from "better-sqlite3";
 import { DB_PATH, DEFAULT_SETTINGS } from "./config";
+import { applyMockPrefsUpdate, getMockPrefs } from "./mock-dashboard-data";
+import { isMockMode } from "./mock-mode";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS favorites (
@@ -105,10 +107,16 @@ function readPrefs(conn: Database.Database): Prefs {
 }
 
 export function getPrefs(): Prefs {
+  if (isMockMode()) {
+    return getMockPrefs();
+  }
   return readPrefs(getDb());
 }
 
 export function updatePrefs(data: Record<string, unknown>): Prefs {
+  if (isMockMode()) {
+    return applyMockPrefsUpdate(data);
+  }
   const conn = getDb();
   const tx = conn.transaction(() => {
     if ("favorites" in data && Array.isArray(data.favorites)) {

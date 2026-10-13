@@ -3,6 +3,8 @@ import path from "path";
 import Database from "better-sqlite3";
 import { randomUUID } from "crypto";
 import { DB_PATH } from "./config";
+import { getMockProjects } from "./mock-dashboard-data";
+import { isMockMode } from "./mock-mode";
 import {
   parseProjectEnvironment,
   type Project,
@@ -109,6 +111,9 @@ function readProjects(conn: Database.Database): Project[] {
 }
 
 export function listProjects(): Project[] {
+  if (isMockMode()) {
+    return getMockProjects();
+  }
   return readProjects(getDb());
 }
 
