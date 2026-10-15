@@ -46,3 +46,6 @@ next-env.d.ts
 .dev-workspace/
 # Dev Workspace MCP consumer (token scoped — install-kit)
 .cursor/mcp.json
+
+# v3: assets gerados por `npm run build:web` (embutidos no binário no build da imagem)
+/web/dist/
