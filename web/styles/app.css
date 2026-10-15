@@ -1970,9 +1970,14 @@
         align-items: stretch;
       }
       .dashboard-panel-head--containers .toolbar {
+        flex: 0 0 auto;
         flex-direction: column;
         align-items: stretch;
         justify-content: flex-start;
+      }
+      .dashboard-panel-head--containers .search-wrap {
+        flex: 0 0 auto;
+        max-width: none;
       }
       .dashboard-panel-head--containers .sort {
         margin-left: 0;
