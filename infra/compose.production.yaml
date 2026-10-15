@@ -1,6 +1,6 @@
 name: homelab-app
 
-# Deploy: docker compose -f infra/compose.production.yaml up -d --build
+# Deploy: make deploy  (= BUILD_ID=<git sha> docker compose -f infra/compose.production.yaml up -d --build)
 # Imagem FROM scratch (~14 MB) com binário Go estático; healthcheck embutido na imagem.
 services:
   app:
@@ -8,6 +8,8 @@ services:
     build:
       context: ..
       dockerfile: infra/Dockerfile
+      args:
+        BUILD_ID: ${BUILD_ID:-dev}
     container_name: homelab-app
     restart: unless-stopped
     ports:

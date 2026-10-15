@@ -22,6 +22,16 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
       -trimpath -ldflags="-s -w -X main.buildID=${BUILD_ID}" \
       -o /out/homelab ./cmd/homelab
 
+# Preview com dados fictícios (sem Docker nem SQLite):
+#   docker build -f infra/Dockerfile --target mock -t homelab-app-mock .
+#   docker run -d -p 10003:3000 homelab-app-mock
+FROM scratch AS mock
+COPY --from=build /out/homelab /homelab
+ENV HOMELAB_MOCK=1 PORT=3000 TZ=America/Sao_Paulo
+EXPOSE 3000
+USER 65532:65532
+ENTRYPOINT ["/homelab"]
+
 # Imagem final vazia: só o binário estático (assets, template e tzdata embutidos).
 # Não há certificados CA porque o app só fala com o socket local do Docker.
 FROM scratch

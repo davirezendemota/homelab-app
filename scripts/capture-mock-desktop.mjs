@@ -5,7 +5,7 @@ import { chromium } from "playwright";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
-const baseUrl = process.env.MOCK_URL ?? "http://127.0.0.1:10002";
+const baseUrl = process.env.MOCK_URL ?? "http://127.0.0.1:10003";
 const outDir = path.join(root, "docs", "screenshots");
 const outFile = path.join(outDir, "dashboard-mock-desktop.png");
 

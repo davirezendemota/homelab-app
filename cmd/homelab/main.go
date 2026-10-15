@@ -50,7 +50,11 @@ func runHealthcheck() int {
 }
 
 func runServer() error {
-	log.Printf("homelab v3 boot build=%s mock=%v", buildID, mock.Enabled())
+	// HOMELAB_BUILD_ID (env) tem prioridade; senão vale o -X main.buildID do build.
+	if config.ModuleBuild == "dev" && buildID != "dev" {
+		config.ModuleBuild = buildID
+	}
+	log.Printf("homelab v3 boot build=%s mock=%v", config.ModuleBuild, mock.Enabled())
 
 	var db *sql.DB
 	var dockerClient *docker.Client

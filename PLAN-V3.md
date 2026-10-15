@@ -915,3 +915,59 @@ Estimativa total: **~6–7 dias** de trabalho.
 - Autenticação (continua sem auth, rede local).
 - Multi-host / múltiplos endpoints Docker.
 - Métricas históricas persistidas (o `usageHistory` continua em memória no cliente).
+
+---
+
+## 15. Status da execução (2026-10-15)
+
+v3 em produção na porta 80 desde 2026-10-15 (`make deploy`); container da v2 removido.
+Imagem da v2 (`homelab-app:latest`) mantida para rollback; backup do banco em
+`data/homepage.db.bak-v2-20261015`.
+
+### Medições (produção, 56 containers)
+
+| Métrica | Meta | v2 | v3 | |
+|---|---|---|---|---|
+| RAM do container | ≤ 20 MiB | ~125 MiB | ~8 MiB (RSS 17–19 MiB) | ok |
+| Imagem | ≤ 15 MB | 587 MB | 13,6 MB (`FROM scratch`) | ok |
+| JS na 1ª carga | ≤ 25 KB gz | ~280 KB | 20,7 KB | ok |
+| HTML da home | ≤ 30 KB | 322 KB | 20 KB (5,7 KB gz) | ok |
+| CSS | ≤ 25 KB | 93 KB | 66 KB (12,4 KB gz) | **não** — ver desvios |
+| CPU do `dockerd` (1 aba aberta) | ≤ 50% da v2 | 10,1% | 2,2% | ok |
+| CPU do `dockerd` (sem clientes) | coleta pausada | 10,1% | 0,6% | ok |
+| CPU do processo | < 1% | — | 0,2–0,4% | ok |
+| `docker stop` → UI | ≤ 1 s | até 5 s | ~0,3 s | ok |
+| CPU por container × `docker stats` | ±1 p.p. | — | 49,97% × 49,28% (carga fixa) | ok |
+| Memória por container × `docker stats` | ±0,5 p.p. | — | máx. 0,03 p.p. (37 containers) | ok |
+| Paridade visual (diff de pixels, mock) | ≤ 2% | — | 0,02% desktop, 0,09% mobile, ≤ 1,1% nos estados | ok |
+
+### Desvios e decisões
+
+- **CSS 66 KB:** 40 KB são o CSS de design herdado da v2 e 17 KB utilities usadas. Ficar
+  em 25 KB exigiria redesenhar o visual, o que contraria a paridade. Removidas as regras
+  mortas e as variantes Tailwind que nunca casam (75 → 66 KB, saída visual idêntica).
+- **Custo real do `dockerd`:** não era o polling de stats, e sim `/system/df` a cada 60s
+  (~4,4 s de CPU por chamada). Na v3 ele roda só ao abrir o detalhe de armazenamento,
+  com cache de 5 min (spec 10.5 ajustada).
+- **Listagem por ciclo mantida:** `/containers/json` a cada 5s com o painel aberto
+  (0,02 s de CPU do dockerd), para manter o uptime ("Up 3 minutes") atualizado; o
+  `/events` dá a atualização imediata.
+- **Deploy por Docker Compose** em vez de Portainer (não é mais usado no host).
+- **Preview mock na porta 10003** (a 10002 é usada por outro serviço).
+
+### Bugs encontrados na validação e corrigidos (todos com teste)
+
+- Deadlock em `ListProjects` (query aninhada no pool de conexão única).
+- Prefs vazias serializadas como `null` em vez de `[]`.
+- Armazenamento contava diretórios comuns como discos (sem checagem de ponto de montagem/device).
+- Demux de logs devolvia bytes binários quando um frame chegava partido.
+- Hub SSE descartava o `status` inicial quando o `history` chegava em seguida.
+- Histórico duplicava o evento quando a ação vinha pela API e pelo `/events`.
+- Temperatura principal usava a primeira leitura, não a maior; detalhe sem rótulos e duplicado.
+- Detalhe de armazenamento incompleto (seções de imagens/volumes/build cache vazias).
+- Assets servidos sem gzip e sem versionamento na URL (cache `immutable`).
+
+### Pendências
+
+- AC-OPS-05 (48 h sem erro/sem crescimento de RSS): em observação a partir do corte.
+- AC-UI-17 (navegação completa por teclado) e AC-WEB-05 (Lighthouse): não executados.
