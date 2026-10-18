@@ -1,22 +1,22 @@
 # Design System — Homelab App
 
-Documentação das decisões visuais, tokens e padrões de UI do dashboard de containers Docker. A interface combina **shadcn/ui** (estilo `base-nova`, cor base `neutral`) com CSS de domínio em `src/app/globals.css`.
+Documentação das decisões visuais, tokens e padrões de UI do dashboard de containers Docker. A interface combina **shadcn/ui** (estilo `base-nova`, cor base `neutral`) com CSS de domínio em `web/styles/app.css`. Na v3 não há React: os componentes shadcn viraram strings de classe em `web/src/ui.ts`, com o mesmo resultado visual.
 
 ## Stack e convenções
 
 | Camada | Tecnologia |
 |--------|------------|
-| Framework | Next.js (App Router) |
+| Framework | Nenhum — TS + idiomorph, servido por binário Go (v3) |
 | Estilo utilitário | Tailwind CSS v4 (`@import "tailwindcss"`) |
-| Componentes | shadcn/ui + Base UI (`components.json`: `style: base-nova`) |
+| Componentes | Visual shadcn/ui (`style: base-nova`) reproduzido por classes em `web/src/ui.ts` |
 | Ícones | Lucide |
 | Variantes | `class-variance-authority` (`cva`) |
 | Merge de classes | `cn` (`@/lib/utils` / pacote `cn`) |
-| Tema padrão | **Dark** (`<html class="dark">` em `src/app/layout.tsx`) |
+| Tema padrão | **Dark** (`<html class="dark">` em `web/index.html`) |
 | Idioma | `pt-BR` |
 
-**Fonte da verdade dos tokens semânticos:** `src/app/globals.css` (`:root` e `.dark`).  
-**Gráficos / SVG (métricas):** `src/lib/shadcn-theme.ts` (valores oklch alinhados ao tema dark).
+**Fonte da verdade dos tokens semânticos:** `web/styles/app.css` (`:root` e `.dark`).  
+**Gráficos / SVG (métricas):** `SHADCN` em `web/src/view-model.ts` (valores oklch alinhados ao tema dark).
 
 ---
 
@@ -91,7 +91,7 @@ Paleta inspirada no GitHub / semáforo de infra (hex fixos no código e CSS):
 | Texto erro suave | `#ffb4ae` | Toasts e mensagens de erro |
 | Neutro (parado) | `SHADCN.mutedForeground` | Container down, CPU 0% |
 
-**Health check** (`healthStyle` em `src/lib/dashboard-view-model.ts`):
+**Health check** (`healthStyle` em `web/src/view-model.ts`):
 
 - `healthy` → verde `#56d364` + fundo `rgba(63,185,80,.10)`
 - `starting` → amarelo `#e3b341` + fundo `rgba(210,153,34,.12)`
@@ -161,7 +161,7 @@ Estes blocos vivem principalmente em **classes CSS** (não em `components/ui`), 
 
 ## Componentes shadcn/ui
 
-Diretório: `src/components/ui/`. Configuração: `components.json`.
+Na v3 os componentes não existem como React: as classes finais que eles geravam estão em `web/src/ui.ts`, e o comportamento (menu, diálogo, checkbox) em `web/src/menu.ts` e `web/src/project-editor.ts`.
 
 | Componente | Arquivo | Variantes / notas |
 |----------|---------|-------------------|
@@ -234,9 +234,8 @@ Importar `SHADCN` de `@/lib/shadcn-theme` para eixos, séries neutras ou estados
 
 | Arquivo | Conteúdo |
 |---------|----------|
-| `src/app/globals.css` | Tokens, tema, ~95% do layout dashboard |
-| `src/app/layout.tsx` | Fontes, `dark`, metadata |
-| `components.json` | Preset shadcn |
-| `src/lib/shadcn-theme.ts` | Constantes oklch para charts |
-| `src/lib/dashboard-view-model.ts` | Cores de status, CPU, dots |
-| `src/lib/host-metrics.ts` | Cores de meters e storage |
+| `web/styles/app.css` | Tokens, tema, ~95% do layout dashboard |
+| `web/index.html` | Fontes (preload), `dark`, metadata |
+| `web/src/view-model.ts` (`SHADCN`) | Constantes oklch para charts |
+| `web/src/view-model.ts` | Cores de status, CPU, dots |
+| `internal/metrics/host.go` | Cores de meters e storage |
