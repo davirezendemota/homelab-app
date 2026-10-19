@@ -32,6 +32,7 @@ type Collector struct {
 	lastByHost   map[string]model.PagePayload
 
 	cgroup *CgroupReader
+	agents *AgentReader
 
 	// Detalhe de armazenamento (GET /system/df): custa ~4 s de CPU ao dockerd por chamada,
 	// então é calculado só quando o modal é aberto, com cache.
@@ -53,6 +54,7 @@ func NewCollector(client *docker.Client, hist *history.Store, h *hub.Hub) *Colle
 		state:        "warming",
 		lastActivity: time.Now(),
 		cgroup:       NewCgroupReader(client),
+		agents:       NewAgentReader(),
 		relistCh:     make(chan struct{}, 1),
 	}
 }
@@ -231,7 +233,7 @@ func (c *Collector) refresh(ctx context.Context) {
 		c.history.ObserveContainers(rows)
 	}
 
-	meters := BuildMeters()
+	meters := withAgentsMeter(BuildMeters(), AgentsMeter(c.agents.Sessions()))
 	meterUpdates["temp"] = map[string]interface{}{
 		"rows":  TemperatureSensorDetails(),
 		"total": 100,
@@ -428,10 +430,46 @@ func meterChanged(a, b model.Meter) bool {
 			return true
 		}
 	}
+	if as, ok := a["sessions"].([]model.AgentSession); ok {
+		bs, _ := b["sessions"].([]model.AgentSession)
+		if !sessionsEqual(as, bs) {
+			return true
+		}
+	}
 	if ap, ok := a["pct"].(int); ok {
 		if bp, ok2 := b["pct"].(int); ok2 && ap != bp {
 			return true
 		}
 	}
 	return false
+}
+
+func sessionsEqual(a, b []model.AgentSession) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		x, y := a[i], b[i]
+		if x.ID != y.ID || x.CPUDisplay != y.CPUDisplay || x.MemDisplay != y.MemDisplay || x.Uptime != y.Uptime || x.Parent != y.Parent || x.Cwd != y.Cwd {
+			return false
+		}
+	}
+	return true
+}
+
+// withAgentsMeter insere o card de sessões logo depois do de Temperatura.
+func withAgentsMeter(meters []model.Meter, agents model.Meter) []model.Meter {
+	out := make([]model.Meter, 0, len(meters)+1)
+	inserted := false
+	for _, m := range meters {
+		out = append(out, m)
+		if m["detailKey"] == "temp" {
+			out = append(out, agents)
+			inserted = true
+		}
+	}
+	if !inserted {
+		out = append(out, agents)
+	}
+	return out
 }

@@ -30,6 +30,24 @@ type StorageMount struct {
 
 type Meter map[string]interface{}
 
+// AgentSession é uma sessão de agente de código (Claude Code, Cursor Agent) no host.
+type AgentSession struct {
+	ID         string  `json:"id"`
+	Parent     string  `json:"parent"` // ID da sessão que iniciou este agente (subagent); vazio na raiz
+	Kind       string  `json:"kind"`
+	Label      string  `json:"label"`
+	PID        int     `json:"pid"`
+	Cwd        string  `json:"cwd"`
+	StartedAt  int64   `json:"startedAt"`
+	Uptime     string  `json:"uptime"`
+	Procs      int     `json:"procs"`
+	CPUPct     float64 `json:"cpuPct"`
+	CPUDisplay string  `json:"cpuDisplay"`
+	MemBytes   uint64  `json:"memBytes"`
+	MemDisplay string  `json:"memDisplay"`
+	Color      string  `json:"color"`
+}
+
 type PagePayload struct {
 	Host             string                    `json:"host"`
 	Build            string                    `json:"build"`
