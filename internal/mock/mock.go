@@ -212,11 +212,36 @@ func buildMeters() []model.Meter {
 		{"label": "CPU", "display": "38%", "sub": "12 cores", "showSub": true, "color": meterColor(cpu), "barWidth": "38%", "showBar": true, "showChart": true, "chartKey": "cpu", "pct": cpu, "showCaption": false, "caption": "", "detailKey": "cpu"},
 		{"label": "RAM", "display": "62%", "sub": "19.8 / 32 GB", "showSub": true, "color": meterColor(ramPct), "barWidth": "62%", "showBar": true, "showChart": true, "chartKey": "ram", "pct": ramPct, "showCaption": false, "caption": "", "detailKey": "ram"},
 		{"label": "Temperatura", "display": "51°C", "sub": "Package · coretemp", "showSub": true, "color": meterColor(tempC), "barWidth": "51%", "showBar": true, "showChart": true, "chartKey": "temp", "pct": tempPct, "showCaption": false, "caption": "", "detailKey": "temp"},
+		agentsMeter(),
 		{"label": "Armazenamento", "type": "storage", "display": "58%", "sub": "412.4 / 712 GB", "showSub": true, "color": meterColor(storagePct), "barWidth": "58%", "showBar": false, "showCaption": false, "caption": "", "detailKey": "storage",
 			"main": model.StorageMount{Path: "/", Label: "Raiz (nvme0n1p2)", Pct: 61, UsedGB: 380.2, TotalGB: 620, Color: "#3fb950"},
 			"mounts": []model.StorageMount{
 				{Path: "/mnt/nas", Label: "NAS (ZFS)", Pct: 72, UsedGB: 28.4, TotalGB: 39.5, Color: "#6cb6ff"},
 				{Path: "/mnt/backup", Label: "Backup USB", Pct: 44, UsedGB: 3.9, TotalGB: 8.9, Color: "#a371f7"},
 			}},
+	}
+}
+
+func agentsMeter() model.Meter {
+	const minute = int64(60_000)
+	session := func(kind, label string, pid int, parent, cwd string, age int64, uptime string, procs int, cpu float64, cpuDisplay string, mem uint64, memDisplay string) model.AgentSession {
+		return model.AgentSession{
+			ID: fmt.Sprintf("%s-%d", kind, pid), Parent: parent, Kind: kind, Label: label, PID: pid, Cwd: cwd,
+			StartedAt: bootAt - age*minute, Uptime: uptime, Procs: procs,
+			CPUPct: cpu, CPUDisplay: cpuDisplay, MemBytes: mem, MemDisplay: memDisplay, Color: meterColor(cpu),
+		}
+	}
+	const mib = 1024 * 1024
+	sessions := []model.AgentSession{
+		session("cursor", "Cursor Agent", 1977128, "", "~/projeto-biblioteca-fotos", 73, "1 h 13 min", 3, 1.1, "1.1%", 413*mib, "413.3 MB"),
+		session("claude", "Claude Code", 2013899, "", "~/workspace/sweetcred", 55, "55 min", 6, 7.0, "7.0%", 453*mib, "453.4 MB"),
+		session("claude", "Claude Code", 2014520, "claude-2013899", "~/workspace/sweetcred", 4, "4 min", 1, 18.3, "18.3%", 212*mib, "212.0 MB"),
+		session("cursor", "Cursor Agent", 2026846, "", "~/workspace/sweetcred", 41, "41 min", 2, 12.7, "12.7%", 704*mib, "704.0 MB"),
+		session("claude", "Claude Code", 2129967, "", "~/workspace/homelab-app", 11, "11 min", 1, 5.5, "5.5%", 306*mib, "306.2 MB"),
+	}
+	return model.Meter{
+		"label": "Agent Sessions", "type": "agents", "display": "5", "sub": "4 sessões · 1 subagent · 2.0 GB",
+		"showSub": true, "color": "oklch(0.708 0 0)", "barWidth": "0%", "showBar": false, "showCaption": false, "caption": "",
+		"sessions": sessions,
 	}
 }
