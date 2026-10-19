@@ -1,0 +1,38 @@
+name: homelab-app-local
+
+# Homologação local, lado a lado com a produção (porta 80):
+#   docker compose -f infra/compose.local.yaml up -d --build   → http://homelab01:10004
+#   docker compose -f infra/compose.local.yaml down
+# Mesma imagem e permissões da produção, mas com tag própria e /data efêmero (tmpfs):
+# prefs e projetos de teste somem ao recriar o container.
+services:
+  app:
+    image: homelab-app:local
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+      args:
+        BUILD_ID: ${BUILD_ID:-local}
+    container_name: homelab-app_local
+    restart: unless-stopped
+    ports:
+      - "10004:3000"
+    environment:
+      TZ: America/Sao_Paulo
+      LINK_HOST: homelab01
+    # Pasta das sessões de agentes (Agent Sessions): ler /proc/<pid>/cwd exige o mesmo
+    # uid dos processos (davi = 1000) e AppArmor sem a regra de ptrace do docker-default.
+    user: "1000:1000"
+    tmpfs:
+      - /data:uid=1000,gid=1000,mode=0700
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /:/host:ro,rslave
+    group_add:
+      - "990" # GID do grupo docker no host (getent group docker)
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+      - apparmor=unconfined
+    mem_limit: 64m
