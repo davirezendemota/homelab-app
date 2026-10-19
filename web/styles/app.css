@@ -261,6 +261,15 @@
       gap: var(--dashboard-panel-gap);
     }
     .dashboard-meters-col { min-width: 0; }
+    /* Layout em linha: a pilha (monitor, agents, histórico) fica entre Projetos e Containers;
+       o último painel perde a margem pelo :last-child, então o espaço vem da pilha. */
+    body:not(.meters-vertical) .dashboard-meters-stack {
+      margin-bottom: var(--dashboard-panel-gap);
+    }
+    /* Dentro da pilha o espaçamento é só o gap (a margem do painel somaria: 40px). */
+    .dashboard-meters-stack > .dashboard-panel {
+      margin-bottom: 0;
+    }
     .dashboard-meters-stack {
       display: flex;
       flex-direction: column;
@@ -348,15 +357,7 @@
     body.meters-vertical .dashboard-main .dashboard-panel {
       margin-bottom: 0;
     }
-    body.meters-vertical .dashboard-meters-col .dashboard-meters-stack {
-      position: sticky;
-      top: 72px;
-      align-self: start;
-      max-height: calc(100dvh - 88px);
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      scrollbar-gutter: stable;
-    }
+    /* Na lateral o monitor cresce com o conteúdo: sem sticky, limite de altura ou scroll próprio. */
     body.meters-vertical .dashboard-meters-col .meters {
       grid-template-columns: 1fr;
       margin-bottom: 0;
@@ -970,6 +971,130 @@
       color: var(--muted-foreground);
       font-weight: 500;
       margin-top: 12px;
+    }
+    .dashboard-panel--agents {
+      padding-top: 16px;
+      padding-bottom: 14px;
+    }
+    .dashboard-panel-head--agents {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .dashboard-panel-head--agents .dashboard-panel-eyebrow {
+      margin-bottom: 0;
+    }
+    .agents-panel-sub {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--muted-foreground);
+      white-space: nowrap;
+    }
+    .agent-head,
+    .agent-row {
+      display: grid;
+      grid-template-columns: 18px minmax(0, 1fr) 56px 64px;
+      align-items: center;
+      column-gap: 10px;
+    }
+    .agent-head {
+      padding: 0 6px 4px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--muted-foreground);
+    }
+    .agent-head > span:first-child {
+      grid-column: 1 / 3;
+    }
+    .agent-head > span:not(:first-child) {
+      text-align: right;
+    }
+    .agent-list {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .agent-row {
+      border-radius: 6px;
+      padding: 5px 6px;
+      transition: background .12s ease;
+    }
+    .agent-row:hover {
+      background: rgba(255, 255, 255, .04);
+    }
+    .agent-logo {
+      display: inline-flex;
+      width: 18px;
+      height: 18px;
+      color: var(--muted-foreground);
+    }
+    .agent-logo svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .agent-logo--claude { color: #d97757; }
+    .agent-logo--cursor { color: var(--foreground); }
+    .agent-info {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .agent-name {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .agent-folder {
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .agent-sub-badge {
+      flex-shrink: 0;
+      padding: 1px 6px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: .02em;
+      color: var(--muted-foreground);
+    }
+    /* Subagent: recuo com uma guia à esquerda, ligando visualmente ao pai acima. */
+    .agent-row--sub {
+      margin-left: 9px;
+      padding-left: 14px;
+      border-left: 1px solid var(--border);
+      border-radius: 0 6px 6px 0;
+    }
+    .agent-meta {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10.5px;
+      color: var(--muted-foreground);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .agent-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      text-align: right;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+    .agent-empty {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted-foreground);
     }
     .storage-bars {
       display: flex;
@@ -1952,11 +2077,6 @@
       body.meters-vertical .wrap { max-width: 1320px; }
       body.meters-vertical .dashboard-layout {
         grid-template-columns: 1fr;
-      }
-      body.meters-vertical .dashboard-meters-col .dashboard-meters-stack {
-        position: static;
-        max-height: none;
-        overflow: visible;
       }
       body.meters-vertical .dashboard-meters-col .meters {
         margin-bottom: 26px;

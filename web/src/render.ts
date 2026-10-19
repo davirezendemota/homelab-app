@@ -3,7 +3,7 @@
 import * as I from "./icons";
 import * as UI from "./ui";
 import { esc } from "./ui";
-import type { ContainerRow, LifecycleEvent, Meter, PagePayload, Project, StorageMount } from "./types";
+import type { AgentSession, ContainerRow, LifecycleEvent, Meter, PagePayload, Project, StorageMount } from "./types";
 import {
   SHADCN,
   buildLists,
@@ -168,6 +168,32 @@ function storageRow(row: StorageMount): string {
     + `<div class="storage-bar"><span style="width:${esc(row.pct)}%;background:${esc(row.color)}"></span></div><span class="storage-pct">${esc(row.pct)}%</span></div>`;
 }
 
+function agentRow(a: AgentSession): string {
+  // Logo do agente + só o nome da pasta atual; subagents (agente iniciado por outro) ganham selo e recuo.
+  const folder = a.cwd === "~" ? "~" : a.cwd.split("/").filter(Boolean).pop() || `PID ${a.pid}`;
+  const sub = a.parent ? `<span class="agent-sub-badge">subagent</span>` : "";
+  const procs = a.procs > 1 ? ` (${a.procs} processos)` : "";
+  const title = [a.label, a.parent ? "subagent" : "", folder, a.uptime, `PID ${a.pid}`].filter(Boolean).join(" · ");
+  return `<div class="agent-row${a.parent ? " agent-row--sub" : ""}" id="agent-${esc(a.id)}" title="${esc(title)}${esc(procs)}">`
+    + `<span class="agent-logo agent-logo--${esc(a.kind)}">${I.AGENT_LOGOS[a.kind] ?? ""}</span>`
+    + `<div class="agent-info"><span class="agent-name"><span class="agent-folder">${esc(folder)}</span>${sub}</span><span class="agent-meta">${esc(a.uptime)}</span></div>`
+    + `<span class="agent-value" style="color:${esc(a.color)}">${esc(a.cpuDisplay)}</span>`
+    + `<span class="agent-value">${esc(a.memDisplay)}</span></div>`;
+}
+
+// Painel próprio: acima do monitor na lateral, abaixo dele no layout em linha.
+function renderAgentsPanel(m: Meter | undefined): string {
+  if (!m) return "";
+  const sessions = (m.sessions as AgentSession[] | undefined) ?? [];
+  const body = sessions.length === 0
+    ? `<p class="agent-empty">Nenhuma sessão ativa</p>`
+    : `<div class="agent-head" aria-hidden="true"><span>Sessão</span><span>CPU</span><span>RAM</span></div>`
+      + `<div class="agent-list">${sessions.map(agentRow).join("")}</div>`;
+  return `<section class="dashboard-panel dashboard-panel--agents" id="agents-panel" aria-label="Agent Sessions">`
+    + `<div class="dashboard-panel-head dashboard-panel-head--agents"><span class="dashboard-panel-eyebrow">Agent Sessions</span>`
+    + `<span class="agents-panel-sub">${esc(m.sub)}</span></div>${body}</section>`;
+}
+
 function chartSvgBody(points: ChartPoint[], color: string): string {
   if (!points.length) return "";
   const W = 200;
@@ -220,8 +246,10 @@ function renderMetersColumn(s: ViewState): string {
   const meters = `<section class="dashboard-panel dashboard-panel--meters" aria-label="Monitor de recursos">`
     + `<div class="dashboard-panel-head dashboard-panel-head--meters"><span class="dashboard-panel-eyebrow">Monitor de recursos</span>`
     + `<button type="button" data-slot="button" id="meters-layout-toggle" title="${label}" aria-label="${label}" aria-pressed="${vertical}" class="${UI.BTN_GHOST_ICON_SM} meters-layout-toggle">${I.LAYOUT_PANEL_LEFT}</button></div>`
-    + `<div class="meters" id="meters">${s.data.meters.map((m) => renderMeter(m, s)).join("")}</div></section>`;
-  return `<div class="dashboard-meters-stack">${meters}${renderHistory(s.data.containerHistory ?? [])}</div>`;
+    + `<div class="meters" id="meters">${s.data.meters.filter((m) => m.type !== "agents").map((m) => renderMeter(m, s)).join("")}</div></section>`;
+  const agents = renderAgentsPanel(s.data.meters.find((m) => m.type === "agents"));
+  const top = vertical ? agents + meters : meters + agents;
+  return `<div class="dashboard-meters-stack">${top}${renderHistory(s.data.containerHistory ?? [])}</div>`;
 }
 
 // ── Histórico ───────────────────────────────────────────────────────────────

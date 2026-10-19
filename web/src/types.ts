@@ -19,6 +19,23 @@ export type StorageMount = {
   color: string;
 };
 
+export type AgentSession = {
+  id: string;
+  parent: string;
+  kind: "claude" | "cursor";
+  label: string;
+  pid: number;
+  cwd: string;
+  startedAt: number;
+  uptime: string;
+  procs: number;
+  cpuPct: number;
+  cpuDisplay: string;
+  memBytes: number;
+  memDisplay: string;
+  color: string;
+};
+
 export type Meter = Record<string, unknown> & {
   label: string;
   display: string;
