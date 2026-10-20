@@ -27,8 +27,14 @@ struct PopoverView: View {
                 .environment(session)
         }
         .task(id: session.selectedTab) {
-            if case .server = session.selectedTab, case .disconnected = session.phase {
-                await session.reconnectIfNeeded()
+            switch session.selectedTab {
+            case .thisMac:
+                session.localMac.startPolling()
+            case .server:
+                session.localMac.stopPolling()
+                if case .disconnected = session.phase {
+                    await session.reconnectIfNeeded()
+                }
             }
         }
     }

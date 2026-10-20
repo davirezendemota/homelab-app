@@ -26,7 +26,7 @@ enum ProcessCwd {
     }
 
     private static func rawPathViaLsof(pid: Int) -> String? {
-        let output = shell("/usr/sbin/lsof", ["-a", "-p", "\(pid)", "-d", "cwd", "-Fn"]) ?? ""
+        let output = Shell.run("/usr/sbin/lsof", arguments: ["-a", "-p", "\(pid)", "-d", "cwd", "-Fn"]) ?? ""
         for line in output.split(separator: "\n") {
             let s = String(line)
             guard s.hasPrefix("n"), s.count > 1 else { continue }
@@ -43,22 +43,4 @@ enum ProcessCwd {
         }
         return path
     }
-}
-
-private func shell(_ launch: String, _ args: [String]) -> String? {
-    guard FileManager.default.isExecutableFile(atPath: launch) else { return nil }
-    let process = Process()
-    let pipe = Pipe()
-    process.executableURL = URL(fileURLWithPath: launch)
-    process.arguments = args
-    process.standardOutput = pipe
-    process.standardError = FileHandle.nullDevice
-    do {
-        try process.run()
-    } catch {
-        return nil
-    }
-    process.waitUntilExit()
-    guard process.terminationStatus == 0 else { return nil }
-    return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
 }

@@ -17,9 +17,6 @@ struct ThisMacPanelView: View {
             }
             .padding(12)
         }
-        .task {
-            session.localMac.startPolling()
-        }
-        .onDisappear { session.localMac.stopPolling() }
+        .onAppear { session.localMac.startPolling() }
     }
 }

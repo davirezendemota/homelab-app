@@ -169,7 +169,7 @@ private enum LocalMacSampler {
 
 enum LocalAgentScanner {
     static func sessions() -> [AgentSession] {
-        let output = shell("/bin/ps", ["-ax", "-o", "pid=,ppid=,rss=,etime=,command="]) ?? ""
+        let output = Shell.run("/bin/ps", arguments: ["-ax", "-o", "pid=,ppid=,rss=,etime=,command="]) ?? ""
         var sessions: [AgentSession] = []
         for line in output.split(separator: "\n") {
             guard let row = parsePSLine(String(line)),
@@ -242,8 +242,9 @@ enum LocalAgentScanner {
 
     private static func agentKind(cmd: String) -> String? {
         if cmd.contains("/cursor-agent/") && !cmd.contains("worker-server") { return "cursor" }
+        if cmd.contains(".local/bin/agent") && cmd.contains("/cursor-agent/") { return "cursor" }
         if cmd.contains("@anthropic-ai/claude-code/cli.js") { return "claude" }
-        if cmd.hasPrefix("claude ") || cmd.contains("/claude ") { return "claude" }
+        if cmd == "claude" || cmd.hasPrefix("claude ") || cmd.contains("/claude ") { return "claude" }
         return nil
     }
 
@@ -260,7 +261,7 @@ enum LocalDockerScanner {
     static func runningContainers() -> [ContainerRow] {
         for path in ["/usr/local/bin/docker", "/opt/homebrew/bin/docker"] {
             guard FileManager.default.isExecutableFile(atPath: path) else { continue }
-            if let rows = parseDockerPS(shell(path, ["ps", "--format", "{{json .}}"]) ?? "") {
+            if let rows = parseDockerPS(Shell.run(path, arguments: ["ps", "--format", "{{json .}}"]) ?? "") {
                 return rows
             }
         }
@@ -306,22 +307,4 @@ enum LocalDockerScanner {
             case ID2 = "Id"
         }
     }
-}
-
-private func shell(_ launch: String, _ args: [String]) -> String? {
-    guard FileManager.default.isExecutableFile(atPath: launch) else { return nil }
-    let process = Process()
-    let pipe = Pipe()
-    process.executableURL = URL(fileURLWithPath: launch)
-    process.arguments = args
-    process.standardOutput = pipe
-    process.standardError = FileHandle.nullDevice
-    do {
-        try process.run()
-    } catch {
-        return nil
-    }
-    process.waitUntilExit()
-    guard process.terminationStatus == 0 else { return nil }
-    return String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
 }
