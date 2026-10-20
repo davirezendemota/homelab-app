@@ -14,6 +14,8 @@ final class HomelabSession {
     /// Último estado conhecido por servidor (para badges nas abas).
     private(set) var profilePhases: [UUID: HomelabConnectionPhase] = [:]
 
+    let localMac = LocalMacMonitor()
+
     private let api = HomelabAPIClient.shared
     private var ssh = SSHManager()
     private var streamTask: Task<Void, Never>?
@@ -40,9 +42,11 @@ final class HomelabSession {
     var menuBarTint: Color {
         switch selectedTab {
         case .thisMac:
-            if profiles.contains(where: { badgeStatus(for: $0.id) == .live }) {
-                return .green
-            }
+            let ram = localMac.resourceMeters.first { $0.chartKey == "ram" }?.pct ?? 0
+            let cpu = localMac.resourceMeters.first { $0.chartKey == "cpu" }?.pct ?? 0
+            if cpu > 90 || ram > 95 { return .red }
+            if cpu > 75 || ram > 85 { return .orange }
+            if cpu > 0 || ram > 0 { return .green }
             return .secondary
         case .server:
             return tint(for: phase, payload: payload)

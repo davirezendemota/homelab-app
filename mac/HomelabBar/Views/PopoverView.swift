@@ -56,7 +56,7 @@ struct PopoverView: View {
     private var subheaderTitle: String {
         switch session.selectedTab {
         case .thisMac:
-            return "Tailscale · este dispositivo"
+            return "Este Mac · \(session.localMacName)"
         case .server:
             return phaseLabel
         }
@@ -95,7 +95,9 @@ struct PopoverView: View {
             if let payload = session.payload {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
-                        AgentSessionsPanel(meter: payload.agentsMeter ?? .emptyAgents)
+                        if let agents = payload.agentsMeter {
+                            AgentSessionsPanel(meter: agents)
+                        }
                         ResourceMonitorPanel(meters: payload.resourceMeters)
                         ActiveContainersPanel(containers: payload.containers) { row, action in
                             Task { await session.performAction(on: row, action: action) }
@@ -113,10 +115,11 @@ struct PopoverView: View {
                 showSettings = true
             }
             Spacer()
-            if case .server = session.selectedTab {
-                Button("Atualizar") {
-                    Task { await session.connect() }
-                }
+            switch session.selectedTab {
+            case .thisMac:
+                Button("Atualizar") { session.localMac.refresh() }
+            case .server:
+                Button("Atualizar") { Task { await session.connect() } }
             }
         }
         .padding(10)
@@ -132,6 +135,26 @@ struct PopoverView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
+    }
+}
+
+struct LocalContainerRowView: View {
+    let row: ContainerRow
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Circle().fill(Theme.accent).frame(width: 6, height: 6)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(row.name).font(.caption.weight(.medium)).lineLimit(1)
+                Text(row.stack).font(.caption2).foregroundStyle(Theme.muted)
+            }
+            Spacer()
+            Text(row.image.split(separator: ":").first.map(String.init) ?? row.image)
+                .font(.caption2)
+                .foregroundStyle(Theme.muted)
+                .lineLimit(1)
+        }
+        .padding(.vertical, 4)
     }
 }
 

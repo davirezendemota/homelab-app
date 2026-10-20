@@ -20,8 +20,10 @@ struct ActiveContainersPanel: View {
                     .foregroundStyle(Theme.muted)
             } else {
                 ForEach(running) { row in
-                    ContainerRowView(row: row) { action in
-                        onAction(row, action)
+                    if row.cpuPct != nil || row.memPct != nil {
+                        ContainerRowView(row: row) { action in onAction(row, action) }
+                    } else {
+                        LocalContainerRowView(row: row)
                     }
                 }
             }
