@@ -157,9 +157,23 @@ struct HomelabProfile: Codable, Identifiable, Sendable {
     }
 }
 
-enum HomelabConnectionPhase: Sendable {
+enum HomelabConnectionPhase: Sendable, Equatable {
     case disconnected
     case connecting
     case live
     case error(String)
+}
+
+/// Aba do popover: Mac local ou um perfil de servidor remoto.
+enum PopoverTab: Hashable {
+    case thisMac
+    case server(UUID)
+}
+
+enum HostBadgeStatus: Sendable {
+    case local
+    case live
+    case connecting
+    case offline
+    case error
 }

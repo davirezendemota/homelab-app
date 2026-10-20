@@ -2,36 +2,44 @@ import SwiftUI
 
 struct PopoverView: View {
     @Environment(HomelabSession.self) private var session
+    @State private var showSettings = false
+    @State private var showAddHost = false
 
     var body: some View {
         VStack(spacing: 0) {
-            header
+            HostTabBar(onAddHost: { showAddHost = true })
+            Divider().opacity(0.3)
+            subheader
             Divider().opacity(0.3)
             content
             Divider().opacity(0.3)
             footer
         }
-        .frame(width: 360, height: 560)
+        .frame(width: 380, height: 580)
         .background(Theme.background)
         .preferredColorScheme(.dark)
-        .task {
-            if case .disconnected = session.phase {
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+                .environment(session)
+        }
+        .sheet(isPresented: $showAddHost) {
+            AddHostSheet()
+                .environment(session)
+        }
+        .task(id: session.selectedTab) {
+            if case .server = session.selectedTab, case .disconnected = session.phase {
                 await session.reconnectIfNeeded()
             }
         }
     }
 
-    private var header: some View {
+    private var subheader: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(session.payload?.host ?? session.selectedProfile?.name ?? "Homelab")
-                    .font(.headline)
-                Text(phaseLabel)
-                    .font(.caption)
-                    .foregroundStyle(Theme.muted)
-            }
+            Text(subheaderTitle)
+                .font(.caption)
+                .foregroundStyle(Theme.muted)
             Spacer()
-            if let url = session.selectedProfile?.dashboardURL {
+            if case .server = session.selectedTab, let url = session.selectedProfile?.dashboardURL {
                 Button {
                     NSWorkspace.shared.open(url)
                 } label: {
@@ -41,23 +49,43 @@ struct PopoverView: View {
                 .help("Abrir dashboard no navegador")
             }
         }
-        .padding(12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+    }
+
+    private var subheaderTitle: String {
+        switch session.selectedTab {
+        case .thisMac:
+            return "Tailscale · este dispositivo"
+        case .server:
+            return phaseLabel
+        }
     }
 
     private var phaseLabel: String {
         switch session.phase {
         case .disconnected: "Desconectado"
-        case .connecting: "Conectando…"
-        case .live: "Ao vivo"
+        case .connecting: "Conectando via Tailscale…"
+        case .live: "Ao vivo · \(session.selectedProfile?.host ?? "")"
         case .error(let msg): msg
         }
     }
 
     @ViewBuilder
     private var content: some View {
+        switch session.selectedTab {
+        case .thisMac:
+            ThisMacPanelView()
+        case .server:
+            serverContent
+        }
+    }
+
+    @ViewBuilder
+    private var serverContent: some View {
         switch session.phase {
         case .disconnected:
-            emptyState("Nenhum servidor configurado", "Abra Ajustes e adicione o homelab.")
+            emptyState("Desconectado", "Selecione o host ou toque em Atualizar.")
         case .connecting:
             ProgressView("Conectando ao homelab-app…")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -128,10 +156,10 @@ struct PopoverView: View {
     private var footer: some View {
         HStack {
             Button("Ajustes…") {
-                NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                showSettings = true
             }
             Spacer()
-            if case .live = session.phase {
+            if case .server = session.selectedTab {
                 Button("Atualizar") {
                     Task { await session.connect() }
                 }
