@@ -17,8 +17,10 @@ services:
     environment:
       TZ: America/Sao_Paulo
       LINK_HOST: homelab01
+    # Mesmo uid dos agentes no host (davi=1000) para ler /host/proc/<pid>/cwd.
+    user: "1000:1000"
     volumes:
-      # data/ precisa pertencer ao uid 65532 (usuário da imagem): sudo chown -R 65532:65532 data
+      # data/ precisa pertencer ao uid do user acima: sudo chown -R 1000:1000 data
       - ../data:/data
       - /var/run/docker.sock:/var/run/docker.sock
       - /:/host:ro,rslave
