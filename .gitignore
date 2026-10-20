@@ -54,3 +54,5 @@ next-env.d.ts
 /mac/**/xcuserdata/
 /mac/**/DerivedData/
 /mac/**/*.xcuserstate
+/mac/dist/
+/mac/build/
