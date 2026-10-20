@@ -11,7 +11,7 @@ struct PopoverView: View {
             Divider().opacity(0.3)
             footer
         }
-        .frame(width: 360, height: 520)
+        .frame(width: 360, height: 560)
         .background(Theme.background)
         .preferredColorScheme(.dark)
         .task {
@@ -67,7 +67,10 @@ struct PopoverView: View {
             if let payload = session.payload {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
-                        metersSection(payload.meters)
+                        if let agents = payload.agentsMeter {
+                            AgentSessionsPanel(meter: agents)
+                        }
+                        hostMetersSection(payload.hostMeters)
                         containersSection(payload.containers)
                     }
                     .padding(12)
@@ -76,7 +79,7 @@ struct PopoverView: View {
         }
     }
 
-    private func metersSection(_ meters: [HomelabMeter]) -> some View {
+    private func hostMetersSection(_ meters: [HomelabMeter]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Host")
                 .font(.subheadline.weight(.semibold))

@@ -39,18 +39,59 @@ struct ContainerLifecycleEvent: Codable, Sendable {
     let kind: String
 }
 
+struct AgentSession: Codable, Sendable, Identifiable {
+    let id: String
+    let parent: String
+    let kind: String
+    let label: String
+    let pid: Int
+    let cwd: String
+    let startedAt: Int64
+    let uptime: String
+    let procs: Int
+    let cpuPct: Double
+    let cpuDisplay: String
+    let memBytes: UInt64
+    let memDisplay: String
+    let color: String
+
+    var isSubagent: Bool { !parent.isEmpty }
+
+    var folderName: String {
+        if cwd == "~" { return "~" }
+        let parts = cwd.split(separator: "/").filter { !$0.isEmpty }
+        if let last = parts.last { return String(last) }
+        return "PID \(pid)"
+    }
+}
+
 /// Mirrors `model.Meter` — UI-oriented host metrics from homelab-app.
 struct HomelabMeter: Codable, Sendable, Identifiable {
-    var id: String { chartKey ?? detailKey ?? label ?? "meter" }
+    var id: String {
+        if type == "agents" { return "agents" }
+        return chartKey ?? detailKey ?? label ?? "meter"
+    }
 
     let label: String?
     let display: String?
     let pct: Int?
     let chartKey: String?
     let detailKey: String?
+    let type: String?
     let color: String?
     let sub: String?
     let barWidth: String?
+    let sessions: [AgentSession]?
+}
+
+extension PagePayload {
+    var agentsMeter: HomelabMeter? {
+        meters.first { $0.type == "agents" }
+    }
+
+    var hostMeters: [HomelabMeter] {
+        meters.filter { $0.chartKey != nil }
+    }
 }
 
 /// HTTP direto ao homelab-app. O caminho previsto é pela rede Tailscale (MagicDNS ou IP 100.x).
