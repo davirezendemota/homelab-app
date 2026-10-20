@@ -57,11 +57,13 @@ struct AgentSession: Codable, Sendable, Identifiable {
 
     var isSubagent: Bool { !parent.isEmpty }
 
+    /// Último componente do diretório de trabalho (ex. `homelab-app`), não o path completo.
     var folderName: String {
-        if cwd == "~" { return "~" }
-        let parts = cwd.split(separator: "/").filter { !$0.isEmpty }
+        let trimmed = cwd.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed != "~" else { return "—" }
+        let parts = trimmed.split(separator: "/").filter { !$0.isEmpty }
         if let last = parts.last { return String(last) }
-        return "PID \(pid)"
+        return "—"
     }
 }
 

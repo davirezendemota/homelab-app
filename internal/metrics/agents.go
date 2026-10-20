@@ -218,10 +218,26 @@ func agentAncestor(pid int, procs map[int]procStat, kinds map[int]string) int {
 // (ver infra/compose.local.yaml); sem isso volta vazio.
 func readCwd(root string, pid int) string {
 	p, err := os.Readlink(filepath.Join(root, strconv.Itoa(pid), "cwd"))
+	if err == nil && p != "" {
+		return homeRe.ReplaceAllString(p, "~$2")
+	}
+	return readCwdFromEnviron(root, pid)
+}
+
+func readCwdFromEnviron(root string, pid int) string {
+	b, err := os.ReadFile(filepath.Join(root, strconv.Itoa(pid), "environ"))
 	if err != nil {
 		return ""
 	}
-	return homeRe.ReplaceAllString(p, "~$2")
+	for _, part := range strings.Split(string(b), "\x00") {
+		if strings.HasPrefix(part, "PWD=") {
+			p := strings.TrimPrefix(part, "PWD=")
+			if p != "" {
+				return homeRe.ReplaceAllString(p, "~$2")
+			}
+		}
+	}
+	return ""
 }
 
 var homeRe = regexp.MustCompile(`^(/home/[^/]+|/root)(/|$)`)

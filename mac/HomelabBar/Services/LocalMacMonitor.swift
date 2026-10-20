@@ -182,7 +182,7 @@ enum LocalAgentScanner {
                 kind: kind,
                 label: kind == "cursor" ? "Cursor Agent" : "Claude Code",
                 pid: row.pid,
-                cwd: "~",
+                cwd: cwd(forPID: row.pid),
                 startedAt: 0,
                 uptime: row.etime,
                 procs: 1,
@@ -236,6 +236,22 @@ enum LocalAgentScanner {
             main: nil,
             mounts: nil
         )
+    }
+
+    private static func cwd(forPID pid: Int) -> String {
+        let output = shell("/usr/sbin/lsof", ["-a", "-p", "\(pid)", "-d", "cwd", "-Fn"]) ?? ""
+        for line in output.split(separator: "\n") {
+            let s = String(line)
+            guard s.hasPrefix("n"), s.count > 1 else { continue }
+            let raw = String(s.dropFirst())
+            let home = FileManager.default.homeDirectoryForCurrentUser.path
+            if raw == home { return "~" }
+            if raw.hasPrefix(home + "/") {
+                return "~" + String(raw.dropFirst(home.count))
+            }
+            return raw
+        }
+        return ""
     }
 
     private static func agentKind(cmd: String) -> String? {
