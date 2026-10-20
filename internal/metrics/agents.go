@@ -130,13 +130,15 @@ func (r *AgentReader) Sessions() []model.AgentSession {
 		if pp := agentAncestor(pid, procs, kinds); pp != 0 {
 			parent = kinds[pp] + "-" + strconv.Itoa(pp)
 		}
+		cwd := resolveAgentCwd(root, pid, procs)
 		sessions = append(sessions, model.AgentSession{
 			ID:         kind + "-" + strconv.Itoa(pid),
 			Parent:     parent,
 			Kind:       kind,
 			Label:      agentLabels[kind],
 			PID:        pid,
-			Cwd:        readCwd(root, pid),
+			Cwd:        cwd,
+			Folder:     agentFolderLabel(cwd),
 			StartedAt:  started,
 			Uptime:     fmtUptime(now.UnixMilli() - started),
 			Procs:      count,
@@ -213,15 +215,124 @@ func agentAncestor(pid int, procs map[int]procStat, kinds map[int]string) int {
 	return 0
 }
 
-// readCwd devolve a pasta da sessão, com a home abreviada para "~". Ler o link exige
-// o mesmo uid do processo e um perfil AppArmor que permita ptrace de leitura
-// (ver infra/compose.local.yaml); sem isso volta vazio.
-func readCwd(root string, pid int) string {
-	p, err := os.Readlink(filepath.Join(root, strconv.Itoa(pid), "cwd"))
-	if err == nil && p != "" {
-		return homeRe.ReplaceAllString(p, "~$2")
+// resolveAgentCwd devolve a pasta da sessão (home abreviada como "~").
+// Ordem: /proc/pid/cwd → environ → caminhos na cmdline (útil quando o container
+// não tem permissão de ptrace no host; ver infra/compose.production.yaml).
+func resolveAgentCwd(root string, pid int, procs map[int]procStat) string {
+	if p := readlinkCwd(root, pid); p != "" {
+		return abbrevHomePath(p)
 	}
-	return readCwdFromEnviron(root, pid)
+	if p := readCwdFromEnviron(root, pid); p != "" {
+		return p
+	}
+	if p := inferCwdFromCmdline(root, pid); p != "" {
+		return abbrevHomePath(p)
+	}
+	return inferCwdFromAncestorCmdline(root, pid, procs)
+}
+
+func readlinkCwd(root string, pid int) string {
+	p, err := os.Readlink(filepath.Join(root, strconv.Itoa(pid), "cwd"))
+	if err != nil || p == "" {
+		return ""
+	}
+	return p
+}
+
+func abbrevHomePath(p string) string {
+	return homeRe.ReplaceAllString(p, "~$2")
+}
+
+func agentFolderLabel(cwd string) string {
+	cwd = strings.TrimSpace(cwd)
+	if cwd == "" {
+		return ""
+	}
+	if cwd == "~" {
+		return "~"
+	}
+	rest := cwd
+	if strings.HasPrefix(rest, "~/") {
+		rest = strings.TrimPrefix(rest, "~/")
+	} else {
+		rest = strings.TrimPrefix(rest, "/")
+	}
+	parts := strings.Split(rest, "/")
+	for i := len(parts) - 1; i >= 0; i-- {
+		if parts[i] != "" && parts[i] != "~" {
+			return parts[i]
+		}
+	}
+	return ""
+}
+
+func hostFSPath(abs string) string {
+	if !strings.HasPrefix(abs, "/") {
+		return abs
+	}
+	if usingHostStorage() {
+		return filepath.Join(config.HostRoot, abs)
+	}
+	return abs
+}
+
+func inferCwdFromCmdline(root string, pid int) string {
+	argv := readCmdline(root, pid)
+	if len(argv) == 0 {
+		return ""
+	}
+	for i, a := range argv {
+		switch a {
+		case "--cwd", "--directory", "-C":
+			if i+1 < len(argv) && strings.HasPrefix(argv[i+1], "/") {
+				return argv[i+1]
+			}
+		}
+	}
+	for _, a := range argv {
+		if !strings.HasPrefix(a, "/home/") && !strings.HasPrefix(a, "/root/") {
+			continue
+		}
+		if isAgentInstallPath(a) {
+			continue
+		}
+		if strings.HasSuffix(a, ".js") || strings.HasSuffix(a, ".mjs") || strings.HasSuffix(a, ".ts") {
+			continue
+		}
+		check := a
+		if st, err := os.Stat(hostFSPath(check)); err == nil && st.IsDir() {
+			return check
+		}
+		if st, err := os.Stat(hostFSPath(filepath.Dir(check))); err == nil && st.IsDir() {
+			return filepath.Dir(check)
+		}
+	}
+	return ""
+}
+
+func isAgentInstallPath(p string) bool {
+	return strings.Contains(p, "/.local/") ||
+		strings.Contains(p, "/cursor-agent/") ||
+		strings.Contains(p, "/node_modules/") ||
+		strings.Contains(p, "/.npm/") ||
+		strings.Contains(p, "@anthropic-ai/claude-code")
+}
+
+func inferCwdFromAncestorCmdline(root string, pid int, procs map[int]procStat) string {
+	seen := map[int]bool{pid: true}
+	for p := procs[pid].ppid; p > 1; p = procs[p].ppid {
+		if seen[p] {
+			break
+		}
+		seen[p] = true
+		if c := inferCwdFromCmdline(root, p); c != "" {
+			return abbrevHomePath(c)
+		}
+		if _, ok := procs[p]; !ok {
+			break
+		}
+	}
+	return ""
 }
 
 func readCwdFromEnviron(root string, pid int) string {

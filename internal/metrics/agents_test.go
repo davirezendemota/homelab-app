@@ -65,7 +65,7 @@ func TestAgentSessionsGroupsProcessTree(t *testing.T) {
 	}
 	c, sub := got[1], got[2]
 	page := uint64(os.Getpagesize())
-	if c.Procs != 2 || c.MemBytes != 1200*page || c.Cwd != "~/workspace/homelab-app" {
+	if c.Procs != 2 || c.MemBytes != 1200*page || c.Cwd != "~/workspace/homelab-app" || c.Folder != "homelab-app" {
 		t.Fatalf("sessão pai deveria somar só 200+201: %+v", c)
 	}
 	if sub.Procs != 2 || sub.MemBytes != 350*page || sub.Label != "Claude Code" {
@@ -80,6 +80,34 @@ func TestAgentSessionsGroupsProcessTree(t *testing.T) {
 	got = r.Sessions()
 	if got[1].CPUPct <= 0 {
 		t.Fatalf("CPU deveria subir após delta de ticks: %+v", got[1])
+	}
+}
+
+func TestResolveAgentCwdFromCmdlinePath(t *testing.T) {
+	root := t.TempDir()
+	old := config.HostRoot
+	config.HostRoot = root
+	defer func() { config.HostRoot = old }()
+
+	proj := filepath.Join(root, "home", "u", "workspace", "sweetcred")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(root, "proc/stat"), "cpu 1 2 3 4\nbtime 1700000000\n")
+	writeProc(t, root, 100, 1, "zsh", "/usr/bin/zsh", 1, 10, 10)
+	writeProc(t, root, 500, 100, "claude", "claude /home/u/workspace/sweetcred", 10, 20, 100)
+
+	r := NewAgentReader()
+	got := r.Sessions()
+	var claude *model.AgentSession
+	for i := range got {
+		if got[i].ID == "claude-500" {
+			claude = &got[i]
+			break
+		}
+	}
+	if claude == nil || claude.Cwd != "~/workspace/sweetcred" || claude.Folder != "sweetcred" {
+		t.Fatalf("cwd pela cmdline: %+v", claude)
 	}
 }
 

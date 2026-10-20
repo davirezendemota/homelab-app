@@ -38,6 +38,7 @@ type AgentSession struct {
 	Label      string  `json:"label"`
 	PID        int     `json:"pid"`
 	Cwd        string  `json:"cwd"`
+	Folder     string  `json:"folder"` // último segmento de cwd (ex. homelab-app)
 	StartedAt  int64   `json:"startedAt"`
 	Uptime     string  `json:"uptime"`
 	Procs      int     `json:"procs"`

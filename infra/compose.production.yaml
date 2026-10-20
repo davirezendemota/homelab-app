@@ -26,6 +26,10 @@ services:
       - "990" # GID do grupo docker no host (getent group docker)
     read_only: true
     cap_drop: [ALL]
+    # Ler /host/proc/<pid>/cwd e environ dos agentes no host (uid ≠ 65532 do container).
+    cap_add:
+      - SYS_PTRACE
     security_opt:
       - no-new-privileges:true
+      - apparmor=unconfined
     mem_limit: 64m

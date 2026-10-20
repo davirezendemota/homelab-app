@@ -3,6 +3,7 @@ package mock
 import (
 	"fmt"
 	"math"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -225,8 +226,14 @@ func buildMeters() []model.Meter {
 func agentsMeter() model.Meter {
 	const minute = int64(60_000)
 	session := func(kind, label string, pid int, parent, cwd string, age int64, uptime string, procs int, cpu float64, cpuDisplay string, mem uint64, memDisplay string) model.AgentSession {
+		folder := cwd
+		if cwd == "~" {
+			folder = "~"
+		} else {
+			folder = filepath.Base(strings.TrimPrefix(strings.TrimPrefix(cwd, "~/"), "/"))
+		}
 		return model.AgentSession{
-			ID: fmt.Sprintf("%s-%d", kind, pid), Parent: parent, Kind: kind, Label: label, PID: pid, Cwd: cwd,
+			ID: fmt.Sprintf("%s-%d", kind, pid), Parent: parent, Kind: kind, Label: label, PID: pid, Cwd: cwd, Folder: folder,
 			StartedAt: bootAt - age*minute, Uptime: uptime, Procs: procs,
 			CPUPct: cpu, CPUDisplay: cpuDisplay, MemBytes: mem, MemDisplay: memDisplay, Color: meterColor(cpu),
 		}

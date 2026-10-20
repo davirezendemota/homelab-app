@@ -176,13 +176,15 @@ enum LocalAgentScanner {
                   let kind = agentKind(cmd: row.cmd)
             else { continue }
             let memBytes = UInt64(max(0, row.rss)) * 1024
+            let cwd = ProcessCwd.abbreviatedPath(forPID: row.pid)
             sessions.append(AgentSession(
                 id: "\(kind)-\(row.pid)",
                 parent: "",
                 kind: kind,
                 label: kind == "cursor" ? "Cursor Agent" : "Claude Code",
                 pid: row.pid,
-                cwd: ProcessCwd.abbreviatedPath(forPID: row.pid),
+                cwd: cwd,
+                folder: AgentSession.folderLabel(from: cwd),
                 startedAt: 0,
                 uptime: row.etime,
                 procs: 1,

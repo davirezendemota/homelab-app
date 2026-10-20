@@ -46,6 +46,7 @@ struct AgentSession: Codable, Sendable, Identifiable {
     let label: String
     let pid: Int
     let cwd: String
+    let folder: String?
     let startedAt: Int64
     let uptime: String
     let procs: Int
@@ -57,8 +58,20 @@ struct AgentSession: Codable, Sendable, Identifiable {
 
     var isSubagent: Bool { !parent.isEmpty }
 
+    static func folderLabel(from cwd: String) -> String {
+        let trimmed = cwd.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed == "~" { return "~" }
+        guard !trimmed.isEmpty else { return "" }
+        let parts = trimmed.split(separator: "/").filter { !$0.isEmpty && $0 != "~" }
+        if let last = parts.last { return String(last) }
+        return ""
+    }
+
     /// Último componente do diretório de trabalho (ex. `homelab-app`), não o path completo.
     var folderName: String {
+        if let folder, !folder.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return folder
+        }
         let trimmed = cwd.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed == "~" { return "~" }
         guard !trimmed.isEmpty else { return "—" }
