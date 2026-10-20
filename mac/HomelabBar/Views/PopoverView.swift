@@ -15,7 +15,7 @@ struct PopoverView: View {
             Divider().opacity(0.3)
             footer
         }
-        .frame(width: 380, height: 580)
+        .frame(width: 400, height: 620)
         .background(Theme.background)
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showSettings) {
@@ -95,60 +95,14 @@ struct PopoverView: View {
             if let payload = session.payload {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 10) {
-                        if let agents = payload.agentsMeter {
-                            AgentSessionsPanel(meter: agents)
+                        AgentSessionsPanel(meter: payload.agentsMeter ?? .emptyAgents)
+                        ResourceMonitorPanel(meters: payload.resourceMeters)
+                        ActiveContainersPanel(containers: payload.containers) { row, action in
+                            Task { await session.performAction(on: row, action: action) }
                         }
-                        hostMetersSection(payload.hostMeters)
-                        containersSection(payload.containers)
                     }
                     .padding(12)
                 }
-            }
-        }
-    }
-
-    private func hostMetersSection(_ meters: [HomelabMeter]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Host")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Theme.muted)
-            ForEach(meters.filter { $0.chartKey != nil }.prefix(4)) { meter in
-                HStack {
-                    Text(meter.label ?? "—")
-                        .frame(width: 88, alignment: .leading)
-                    ProgressView(value: Double(meter.pct ?? 0), total: 100)
-                        .tint(Theme.accent)
-                    Text(meter.display ?? "")
-                        .font(.caption.monospacedDigit())
-                        .frame(width: 52, alignment: .trailing)
-                }
-            }
-        }
-        .padding(10)
-        .background(Theme.card)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    private func containersSection(_ containers: [ContainerRow]) -> some View {
-        let running = containers.filter(\.isRunning)
-        let stopped = containers.filter { !$0.isRunning }
-
-        return VStack(alignment: .leading, spacing: 8) {
-            Text("Containers (\(running.count) ativos)")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Theme.muted)
-
-            ForEach(running.prefix(12)) { row in
-                ContainerRowView(row: row) { action in
-                    Task { await session.performAction(on: row, action: action) }
-                }
-            }
-
-            if !stopped.isEmpty {
-                Text("\(stopped.count) parados")
-                    .font(.caption)
-                    .foregroundStyle(Theme.muted)
-                    .padding(.top, 4)
             }
         }
     }
@@ -199,10 +153,17 @@ struct ContainerRowView: View {
                     .foregroundStyle(Theme.muted)
             }
             Spacer()
-            if let cpu = row.cpuPct {
-                Text(String(format: "%.0f%%", cpu))
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(Theme.muted)
+            HStack(spacing: 6) {
+                if let cpu = row.cpuPct {
+                    Text(String(format: "%.0f%% CPU", cpu))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(Theme.muted)
+                }
+                if let mem = row.memPct {
+                    Text(String(format: "%.0f%% RAM", mem))
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(Theme.muted)
+                }
             }
             Menu {
                 Button("Reiniciar") { onAction("restart") }

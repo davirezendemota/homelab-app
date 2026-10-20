@@ -82,6 +82,33 @@ struct HomelabMeter: Codable, Sendable, Identifiable {
     let sub: String?
     let barWidth: String?
     let sessions: [AgentSession]?
+    let main: StorageMountRow?
+    let mounts: [StorageMountRow]?
+
+    static let emptyAgents = HomelabMeter(
+        label: "Agent Sessions",
+        display: "0",
+        pct: nil,
+        chartKey: nil,
+        detailKey: nil,
+        type: "agents",
+        color: nil,
+        sub: "nenhuma",
+        barWidth: nil,
+        sessions: [],
+        main: nil,
+        mounts: nil
+    )
+}
+
+struct StorageMountRow: Codable, Sendable, Identifiable {
+    var id: String { label }
+    let label: String
+    let pct: Int
+    let used_gb: Double?
+    let total_gb: Double?
+    let color: String?
+    let path: String?
 }
 
 extension PagePayload {
@@ -89,8 +116,13 @@ extension PagePayload {
         meters.first { $0.type == "agents" }
     }
 
-    var hostMeters: [HomelabMeter] {
-        meters.filter { $0.chartKey != nil }
+    /// CPU, RAM, temperatura, armazenamento (igual à web, sem o card de agentes).
+    var resourceMeters: [HomelabMeter] {
+        meters.filter { $0.type != "agents" }
+    }
+
+    var runningContainers: [ContainerRow] {
+        containers.filter(\.isRunning)
     }
 }
 

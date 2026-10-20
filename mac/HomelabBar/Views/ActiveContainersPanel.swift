@@ -1,0 +1,33 @@
+import SwiftUI
+
+struct ActiveContainersPanel: View {
+    let containers: [ContainerRow]
+    var onAction: (ContainerRow, String) -> Void
+
+    private var running: [ContainerRow] {
+        containers.filter(\.isRunning)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Containers ativos (\(running.count))")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Theme.muted)
+
+            if running.isEmpty {
+                Text("Nenhum container em execução")
+                    .font(.caption)
+                    .foregroundStyle(Theme.muted)
+            } else {
+                ForEach(running) { row in
+                    ContainerRowView(row: row) { action in
+                        onAction(row, action)
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .background(Theme.card)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
