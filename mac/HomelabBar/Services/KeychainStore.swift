@@ -14,6 +14,15 @@ enum KeychainStore {
         }
     }
 
+    private static func delete(account: String) {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+        ]
+        SecItemDelete(query as CFDictionary)
+    }
+
     static func savePassword(_ password: String, for profileID: UUID) throws {
         guard let data = password.data(using: .utf8) else { return }
         delete(account: "ssh-\(profileID.uuidString)")

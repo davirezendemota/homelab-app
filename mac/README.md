@@ -16,20 +16,6 @@ Estrutura inspirada no [Deskmon](https://github.com/neur0map/deskmon) (MIT); o t
 
 Não é preciso instalar Xcode: o binário é gerado no **GitHub Actions** (ver abaixo).
 
-## Tailscale
-
-1. No servidor (`homelab01`), o container publica `80:3000` — a API fica em `http://<host-tailscale>/api/...`.
-2. No Mac, confira resolução: `ping homelab01` ou o FQDN do tailnet.
-3. No admin do Tailscale, garanta que o Mac pode alcançar a máquina (ACL padrão costuma permitir).
-4. No Homelab Bar: host = nome MagicDNS, modo **Tailscale**, porta HTTP **80**.
-
-Teste rápido no Mac:
-
-```bash
-curl -sS "http://homelab01/healthz"
-curl -sS "http://homelab01/api/status" | head -c 200
-```
-
 ## Baixar build (CI)
 
 1. Abra o repo no GitHub → **Actions** → workflow **Homelab Bar**.
@@ -44,6 +30,20 @@ Para disparar um build manual: **Actions → Homelab Bar → Run workflow**.
 
 ```bash
 open mac/HomelabBar.xcodeproj   # ou ./mac/build.sh
+```
+
+## Tailscale
+
+1. No servidor (`homelab01`), o container publica `80:3000` — a API fica em `http://<host-tailscale>/api/...`.
+2. No Mac, confira resolução: `ping homelab01` ou o FQDN do tailnet.
+3. No admin do Tailscale, garanta que o Mac pode alcançar a máquina (ACL padrão costuma permitir).
+4. No Homelab Bar: host = nome MagicDNS, modo **Tailscale**, porta HTTP **80**.
+
+Teste rápido no Mac:
+
+```bash
+curl -sS "http://homelab01/healthz"
+curl -sS "http://homelab01/api/status" | head -c 200
 ```
 
 ## Primeiro uso
