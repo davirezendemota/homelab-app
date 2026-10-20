@@ -1,0 +1,57 @@
+name: Homelab Bar
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mac/**"
+      - ".github/workflows/homelab-bar.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "mac/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve Swift packages
+        working-directory: mac
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project HomelabBar.xcodeproj \
+            -scheme HomelabBar
+
+      - name: Build Debug
+        working-directory: mac
+        run: |
+          xcodebuild build \
+            -project HomelabBar.xcodeproj \
+            -scheme HomelabBar \
+            -configuration Debug \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM=""
+
+      - name: Zip app
+        working-directory: mac
+        run: |
+          APP="build/Build/Products/Debug/HomelabBar.app"
+          test -d "$APP" || (find build -name "*.app" -type d; exit 1)
+          ditto -c -k --keepParent "$APP" HomelabBar-Debug.zip
+          ls -lh HomelabBar-Debug.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: HomelabBar-Debug
+          path: mac/HomelabBar-Debug.zip

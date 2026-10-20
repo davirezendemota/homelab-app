@@ -77,6 +77,7 @@ docker run --rm -it -p 3000:3000 -v "$PWD":/src -w /src \
 
 ## Estrutura
 
+- `mac/` — app macOS de menu bar ([Homelab Bar](mac/README.md)), cliente da API v3
 - `cmd/homelab` — entrada (servidor e `homelab healthcheck`)
 - `internal/` — `docker`, `metrics`, `hub` (SSE), `store` (SQLite), `history`, `server`, `mock`
 - `web/` — frontend (`src/`), estilos, fontes e `index.html` (embutidos no binário)

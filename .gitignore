@@ -49,3 +49,8 @@ next-env.d.ts
 
 # v3: assets gerados por `npm run build:web` (embutidos no binário no build da imagem)
 /web/dist/
+
+# macOS menu bar (Xcode)
+/mac/**/xcuserdata/
+/mac/**/DerivedData/
+/mac/**/*.xcuserstate
