@@ -122,7 +122,7 @@ private enum LocalMacSampler {
     private static func memorySnapshot() -> (Int, String) {
         let total = ProcessInfo.processInfo.physicalMemory
         var stats = vm_statistics64()
-        var count = mach_msg_type_number_t(HOST_VM_INFO64_COUNT)
+        var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
         let result = withUnsafeMutablePointer(to: &stats) {
             $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
                 host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
@@ -138,7 +138,7 @@ private enum LocalMacSampler {
 
     private static func sampleCPUPercent() -> Int {
         var load = host_cpu_load_info()
-        var count = mach_msg_type_number_t(HOST_CPU_LOAD_INFO_COUNT)
+        var count = mach_msg_type_number_t(MemoryLayout<host_cpu_load_info>.size / MemoryLayout<integer_t>.size)
         let kr = withUnsafeMutablePointer(to: &load) {
             $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
                 host_statistics(mach_host_self(), HOST_CPU_LOAD_INFO, $0, &count)
