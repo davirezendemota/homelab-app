@@ -80,15 +80,14 @@ struct ResourceMonitorPanel: View {
                 .font(.caption2)
                 .lineLimit(1)
                 .frame(width: 72, alignment: .leading)
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Theme.border)
-                    Capsule()
-                        .fill(Theme.color(hex: row.color))
-                        .frame(width: max(4, geo.size.width * CGFloat(row.pct) / 100))
-                }
+            ZStack(alignment: .leading) {
+                Capsule().fill(Theme.border)
+                Capsule()
+                    .fill(Theme.color(hex: row.color))
+                    .scaleEffect(x: max(0.02, CGFloat(row.pct) / 100), y: 1, anchor: .leading)
             }
             .frame(height: 6)
+            .frame(maxWidth: .infinity)
             Text("\(row.pct)%")
                 .font(.caption2.monospacedDigit())
                 .foregroundStyle(Theme.muted)

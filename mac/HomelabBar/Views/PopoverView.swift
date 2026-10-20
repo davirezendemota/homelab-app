@@ -117,7 +117,7 @@ struct PopoverView: View {
             Spacer()
             switch session.selectedTab {
             case .thisMac:
-                Button("Atualizar") { session.localMac.refresh() }
+                Button("Atualizar") { Task { await session.localMac.refresh() } }
             case .server:
                 Button("Atualizar") { Task { await session.connect() } }
             }
