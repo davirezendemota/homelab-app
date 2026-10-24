@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 
 	"github.com/davi/homelab-app/internal/model"
 )
@@ -47,6 +48,11 @@ func ReadPrefs(db *sql.DB) (model.Prefs, error) {
 			settings.TruncateNames = value == "true"
 		case "verticalMeters":
 			settings.VerticalMeters = value == "true"
+		case "containerColumnWidths":
+			var ints []int
+			if json.Unmarshal([]byte(value), &ints) == nil && len(ints) > 0 {
+				settings.ContainerColumnWidths = ints
+			}
 		}
 	}
 	return model.Prefs{
@@ -149,6 +155,15 @@ func UpdatePrefs(db *sql.DB, data map[string]interface{}) (model.Prefs, error) {
 					if _, err := stmt.Exec(key, val); err != nil {
 						return model.Prefs{}, err
 					}
+				}
+			}
+			if raw, ok := m["containerColumnWidths"]; ok {
+				b, err := json.Marshal(raw)
+				if err != nil {
+					return model.Prefs{}, err
+				}
+				if _, err := stmt.Exec("containerColumnWidths", string(b)); err != nil {
+					return model.Prefs{}, err
 				}
 			}
 		}
