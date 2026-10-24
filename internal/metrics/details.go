@@ -188,10 +188,7 @@ func MeterDetailStorage(ctx context.Context, client *docker.Client) (map[string]
 		if len(c.Names) > 0 {
 			name = strings.TrimPrefix(c.Names[0], "/")
 		}
-		stack := c.Labels["com.docker.compose.project"]
-		if stack == "" {
-			stack = "sem stack"
-		}
+		stack := docker.StackFromLabels(c.Labels).Name
 		containers = append(containers, map[string]interface{}{
 			"name": name, "sub": stack, "value": total, "display": FormatBytes(total),
 			"writable": FormatBytes(c.SizeRw), "image": FormatBytes(c.SizeRootFs), "volumes": FormatBytes(volumes),

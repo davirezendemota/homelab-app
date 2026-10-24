@@ -19,10 +19,7 @@ type Event struct {
 
 func (e Event) Name() string { return e.Actor.Attributes["name"] }
 func (e Event) Stack() string {
-	if s := e.Actor.Attributes["com.docker.compose.project"]; s != "" {
-		return s
-	}
-	return "sem stack"
+	return StackFromLabels(e.Actor.Attributes).Name
 }
 
 // StreamContainerEvents mantém GET /events (só containers) aberto e chama fn para cada

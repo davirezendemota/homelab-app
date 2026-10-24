@@ -28,11 +28,6 @@ func (c *Client) ContainerIdentity(ctx context.Context, ref string) (*ContainerI
 	if name == "" {
 		return nil, nil
 	}
-	stack := "sem stack"
-	if info.Config.Labels != nil {
-		if v := info.Config.Labels["com.docker.compose.project"]; v != "" {
-			stack = v
-		}
-	}
-	return &ContainerIdentity{Name: name, Stack: stack}, nil
+	stack := StackFromLabels(info.Config.Labels)
+	return &ContainerIdentity{Name: name, Stack: stack.Name}, nil
 }

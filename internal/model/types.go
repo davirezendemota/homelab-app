@@ -1,15 +1,16 @@
 package model
 
 type ContainerRow struct {
-	ID     string   `json:"id"`
-	Name   string   `json:"name"`
-	Image  string   `json:"image"`
-	Status string   `json:"status"`
-	Ports  []int    `json:"ports"`
-	Stack  string   `json:"stack"`
-	Health *string  `json:"health"`
-	CPUPct *float64 `json:"cpuPct"`
-	MemPct *float64 `json:"memPct"`
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	Image     string   `json:"image"`
+	Status    string   `json:"status"`
+	Ports     []int    `json:"ports"`
+	Stack     string   `json:"stack"`
+	StackKind string   `json:"stackKind,omitempty"`
+	Health    *string  `json:"health"`
+	CPUPct    *float64 `json:"cpuPct"`
+	MemPct    *float64 `json:"memPct"`
 }
 
 type ContainerLifecycleEvent struct {
@@ -68,9 +69,10 @@ type Prefs struct {
 }
 
 type Settings struct {
-	CompactView    bool `json:"compactView"`
-	TruncateNames  bool `json:"truncateNames"`
-	VerticalMeters bool `json:"verticalMeters"`
+	CompactView           bool  `json:"compactView"`
+	TruncateNames         bool  `json:"truncateNames"`
+	VerticalMeters        bool  `json:"verticalMeters"`
+	ContainerColumnWidths []int `json:"containerColumnWidths,omitempty"`
 }
 
 type Project struct {

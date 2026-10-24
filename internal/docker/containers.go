@@ -88,15 +88,6 @@ func ContainerName(c ListItem) string {
 	return id
 }
 
-func ContainerStack(c ListItem) string {
-	if c.Labels != nil {
-		if v := c.Labels["com.docker.compose.project"]; v != "" {
-			return v
-		}
-	}
-	return "sem stack"
-}
-
 func IsContainerRunning(status string) bool {
 	return strings.HasPrefix(strings.ToLower(status), "up")
 }
@@ -119,14 +110,16 @@ func (c *Client) ListContainers(ctx context.Context) ([]model.ContainerRow, map[
 		}
 		name := ContainerName(item)
 		fullIDs[name] = cid
+		stack := StackFromLabels(item.Labels)
 		rows = append(rows, model.ContainerRow{
-			ID:     shortID,
-			Name:   name,
-			Image:  item.Image,
-			Status: status,
-			Ports:  PublishedPorts(item.Ports),
-			Stack:  ContainerStack(item),
-			Health: ParseHealth(status),
+			ID:        shortID,
+			Name:      name,
+			Image:     item.Image,
+			Status:    status,
+			Ports:     PublishedPorts(item.Ports),
+			Stack:     stack.Name,
+			StackKind: stack.Kind,
+			Health:    ParseHealth(status),
 		})
 	}
 	sort.Slice(rows, func(i, j int) bool {
