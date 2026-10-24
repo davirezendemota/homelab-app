@@ -8,7 +8,8 @@
     "build:web": "node scripts/build-web.mjs",
     "watch:web": "node scripts/build-web.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "screenshot:mock": "node scripts/capture-mock-desktop.mjs"
+    "screenshot:mock": "node scripts/capture-mock-desktop.mjs",
+    "screenshot:containers": "node scripts/capture-containers-table.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.51.1",

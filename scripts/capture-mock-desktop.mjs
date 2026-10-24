@@ -16,7 +16,7 @@ const page = await browser.newPage({
 });
 
 await page.goto(baseUrl, { waitUntil: "networkidle", timeout: 120_000 });
-await page.waitForSelector(".dashboard-panel--containers .row", {
+await page.waitForSelector(".dashboard-panel--containers .container-table", {
   timeout: 60_000,
 });
 await page.waitForSelector(".dashboard-panel--meters .meter", {
