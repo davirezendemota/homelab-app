@@ -12,6 +12,12 @@ import {
 import { closeEditor, isEditorOpen, openEditor } from "./project-editor";
 import { renderSettingsMenu, renderWrap, type ChartPoint, type ViewState } from "./render";
 import { MENU_ITEM } from "./ui";
+import {
+  CONTAINER_COLUMNS,
+  containerTableInlineStyle,
+  normalizeColumnWidths,
+  type ColumnWidths,
+} from "./container-columns";
 import type { BootPayload, PagePayload, Prefs, Project, Settings } from "./types";
 import type { DashboardViewState } from "./view-model";
 
@@ -34,6 +40,7 @@ function normalizePrefs(p: Partial<Prefs> | null | undefined): Prefs {
       compactView: Boolean(p?.settings?.compactView),
       truncateNames: Boolean(p?.settings?.truncateNames),
       verticalMeters: Boolean(p?.settings?.verticalMeters),
+      containerColumnWidths: normalizeColumnWidths(p?.settings?.containerColumnWidths),
     },
   };
 }
@@ -121,6 +128,46 @@ function setSetting(key: keyof Settings, value: boolean) {
   applyBodyClasses();
   void savePrefs({ settings: state.prefs.settings });
   render();
+}
+
+function applyColumnWidthsToDom(widths: ColumnWidths) {
+  const style = containerTableInlineStyle(widths);
+  wrap.querySelectorAll<HTMLElement>(".container-table").forEach((table) => {
+    table.setAttribute("style", style);
+  });
+}
+
+let columnResize: { index: number; startX: number; startW: number; handle: HTMLElement } | null = null;
+
+function onColumnResizePointerDown(e: PointerEvent) {
+  const handle = (e.target as Element).closest<HTMLElement>("[data-col-resize]");
+  if (!handle) return;
+  e.preventDefault();
+  const index = Number(handle.dataset.colResize);
+  if (!Number.isFinite(index)) return;
+  const widths = normalizeColumnWidths(state.prefs.settings.containerColumnWidths);
+  columnResize = { index, startX: e.clientX, startW: widths[index], handle };
+  handle.classList.add("is-dragging");
+  document.body.classList.add("is-col-resizing");
+  handle.setPointerCapture(e.pointerId);
+}
+
+function onColumnResizePointerMove(e: PointerEvent) {
+  if (!columnResize) return;
+  const delta = e.clientX - columnResize.startX;
+  const min = CONTAINER_COLUMNS[columnResize.index].min;
+  const widths = normalizeColumnWidths(state.prefs.settings.containerColumnWidths);
+  widths[columnResize.index] = Math.max(min, Math.round(columnResize.startW + delta));
+  state.prefs.settings = { ...state.prefs.settings, containerColumnWidths: widths };
+  applyColumnWidthsToDom(widths);
+}
+
+function onColumnResizePointerUp(e: PointerEvent) {
+  if (!columnResize) return;
+  columnResize.handle.classList.remove("is-dragging");
+  document.body.classList.remove("is-col-resizing");
+  void savePrefs({ settings: state.prefs.settings });
+  columnResize = null;
 }
 
 function saveHidden() {
@@ -443,6 +490,10 @@ function onWrapClick(e: MouseEvent) {
 }
 
 wrap.addEventListener("click", onWrapClick);
+wrap.addEventListener("pointerdown", onColumnResizePointerDown);
+wrap.addEventListener("pointermove", onColumnResizePointerMove);
+wrap.addEventListener("pointerup", onColumnResizePointerUp);
+wrap.addEventListener("pointercancel", onColumnResizePointerUp);
 
 wrap.addEventListener("input", (e) => {
   const input = e.target as HTMLInputElement;

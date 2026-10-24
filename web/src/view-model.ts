@@ -32,7 +32,13 @@ export type StackBlock = {
   containers: DecoratedContainer[];
   showTitle: boolean;
   isFavorites: boolean;
+  isSwarm: boolean;
 };
+
+function stackGroupKey(c: ContainerRow) {
+  if (c.stackKind === "swarm") return `swarm:${c.stack}`;
+  return c.stack;
+}
 
 export function uptimeSeconds(status: string): number {
   const m = status.match(/up\s+(\d+)\s+(second|minute|hour|day|week|month)/i);
@@ -203,24 +209,47 @@ function groupRowsIntoStacks(
 
   const order: string[] = [];
   const map: Record<string, ContainerRow[]> = {};
+  const displayName: Record<string, string> = {};
+  const isSwarmByKey: Record<string, boolean> = {};
   restRows.forEach((c) => {
-    if (!map[c.stack]) {
-      map[c.stack] = [];
-      order.push(c.stack);
+    const key = stackGroupKey(c);
+    if (!map[key]) {
+      map[key] = [];
+      order.push(key);
+      displayName[key] = c.stack;
+      isSwarmByKey[key] = c.stackKind === "swarm";
     }
-    map[c.stack].push(c);
+    map[key].push(c);
   });
-  for (const name of order) {
-    map[name].sort((a, b) => compareRows(a, b, sortKey, sortDir));
+  for (const key of order) {
+    map[key].sort((a, b) => compareRows(a, b, sortKey, sortDir));
   }
-  order.sort((a, b) => compareStacks(a, b, sortKey, sortDir, map));
+  order.sort((a, b) => {
+    const na = displayName[a];
+    const nb = displayName[b];
+    const aEmpty = isEmptyStack(na);
+    const bEmpty = isEmptyStack(nb);
+    if (aEmpty !== bEmpty) return aEmpty ? 1 : -1;
+    if (sortKey) {
+      const ca = map[a];
+      const cb = map[b];
+      if (ca.length && cb.length) {
+        const r = compareRows(ca[0], cb[0], sortKey, sortDir);
+        if (r !== 0) return r;
+      }
+    }
+    if (na !== nb) return na.localeCompare(nb);
+    if (isSwarmByKey[a] !== isSwarmByKey[b]) return isSwarmByKey[a] ? 1 : -1;
+    return 0;
+  });
 
-  const stacks = order.map((name) => ({
-    name,
-    count: map[name].length,
-    containers: map[name].map(decorate),
-    showTitle: !isEmptyStack(name),
+  const stacks = order.map((key) => ({
+    name: displayName[key],
+    count: map[key].length,
+    containers: map[key].map(decorate),
+    showTitle: !isEmptyStack(displayName[key]),
     isFavorites: false,
+    isSwarm: isSwarmByKey[key],
   }));
 
   if (favRows.length) {
@@ -230,6 +259,7 @@ function groupRowsIntoStacks(
       containers: favRows.map(decorate),
       showTitle: true,
       isFavorites: true,
+      isSwarm: false,
     });
   }
 
@@ -298,7 +328,9 @@ export function buildLists(
 }
 
 export function stackKey(stack: StackBlock) {
-  return stack.isFavorites ? "__favorites__" : stack.name;
+  if (stack.isFavorites) return "__favorites__";
+  if (stack.isSwarm) return `swarm:${stack.name}`;
+  return stack.name;
 }
 
 export function isStackCollapsed(

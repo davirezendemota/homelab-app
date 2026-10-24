@@ -1,5 +1,11 @@
 // Render em string HTML — porta de DashboardHeader/Toolbar/Live/Projects/ContainerHistory (v2).
 // Cada função é pura: recebe o estado e devolve HTML; o main.ts aplica com idiomorph.
+import {
+  CONTAINER_COLUMNS,
+  containerTableInlineStyle,
+  normalizeColumnWidths,
+  type ColumnWidths,
+} from "./container-columns";
 import * as I from "./icons";
 import * as UI from "./ui";
 import { esc } from "./ui";
@@ -269,6 +275,28 @@ function renderHistory(items: LifecycleEvent[]): string {
 
 // ── Containers ──────────────────────────────────────────────────────────────
 
+function columnWidthsFromPrefs(prefs: DashboardPrefsSnapshot): ColumnWidths {
+  return normalizeColumnWidths(prefs.settings.containerColumnWidths);
+}
+
+function renderContainerTableHead(): string {
+  const cells = CONTAINER_COLUMNS.map((col, i) => {
+    const namePad = col.id === "name" ? `<span class="ct-th-name-pad" aria-hidden="true"></span>` : "";
+    const label = col.label
+      ? `<span class="ct-th-label">${esc(col.label)}</span>`
+      : `<span class="ct-th-label ct-th-label--icon" aria-hidden="true">${I.ELLIPSIS}</span>`;
+    const resize = i < CONTAINER_COLUMNS.length - 1
+      ? `<span class="col-resize-handle" data-col-resize="${i}" role="separator" aria-orientation="vertical" aria-label="Redimensionar coluna ${esc(col.label || "ações")}"></span>`
+      : "";
+    return `<div class="ct-th ct-th--${col.id}" role="columnheader"><span class="ct-th-inner">${namePad}${label}${resize}</span></div>`;
+  }).join("");
+  return `<div class="ct-row ct-head" role="row">${cells}</div>`;
+}
+
+function wrapContainerTable(rowsHtml: string, widths: ColumnWidths): string {
+  return `<div class="container-table" role="table" style="${containerTableInlineStyle(widths)}">${renderContainerTableHead()}${rowsHtml}</div>`;
+}
+
 function usageCell(c: DecoratedContainer): string {
   const running = isContainerRunning(c.status);
   const ramPct = running ? (c.memPct ?? 0) : null;
@@ -294,19 +322,19 @@ function renderRow(c: DecoratedContainer, s: ViewState, keyPrefix: string): stri
   const ports = c.noPorts
     ? `<span class="no-ports">—</span>`
     : c.ports.map((p) => `<a class="port-link" href="${esc(portHref(s.data.host, p))}" target="_blank" rel="noopener">:${p}</a>`).join("");
-  return `<div class="row${hidden ? " is-hidden" : ""}" id="${keyPrefix}-c-${esc(c.name)}">`
-    + `<div class="row-name"><span class="status-dot" style="background:${c.dotColor};box-shadow:0 0 0 3px ${c.dotGlow}"></span><span class="name-text" title="${esc(c.name)}">${esc(c.name)}</span></div>`
-    + `<div class="image-text" title="${esc(c.image)}">${esc(c.image)}</div>`
-    + `<div class="status-cell"><span class="status-pill" style="color:${c.statusColor};background:${c.statusBg}">${esc(c.status)}</span></div>`
-    + `<div class="container-actions"><div class="action-group">`
+  return `<div class="ct-row ct-data${hidden ? " is-hidden" : ""}" id="${keyPrefix}-c-${esc(c.name)}" role="row">`
+    + `<div class="ct-cell row-name" role="cell"><span class="status-dot" style="background:${c.dotColor};box-shadow:0 0 0 3px ${c.dotGlow}"></span><span class="name-text" title="${esc(c.name)}">${esc(c.name)}</span></div>`
+    + `<div class="ct-cell image-text" role="cell" title="${esc(c.image)}">${esc(c.image)}</div>`
+    + `<div class="ct-cell status-cell" role="cell"><span class="status-pill" style="color:${c.statusColor};background:${c.statusBg}">${esc(c.status)}</span></div>`
+    + `<div class="ct-cell container-actions" role="cell"><div class="action-group">`
     + (running ? actionBtn(c, "stop", "Parar", I.STOP) : actionBtn(c, "start", "Iniciar", I.PLAY))
     + actionBtn(c, "restart", "Reiniciar", I.RESTART)
     + actionBtn(c, "delete", "Apagar", I.TRASH, " delete-btn")
-    + `</div></div><div class="ports">${ports}</div><div class="row-actions">`
+    + `</div></div><div class="ct-cell ports" role="cell">${ports}</div><div class="ct-cell row-actions" role="cell">`
     + `<button type="button" class="fav-btn${isFav ? " is-on" : ""}" data-fav="${esc(c.name)}" title="${isFav ? "Remover dos favoritos" : "Favoritar"}" aria-label="${isFav ? `Remover ${esc(c.name)} dos favoritos` : `Favoritar ${esc(c.name)}`}" aria-pressed="${isFav}">${I.STAR}</button>`
     + `<button type="button" class="hide-btn${hidden ? " is-on" : ""}" data-hide="${esc(c.name)}" title="${hidden ? "Mostrar container" : "Esconder container"}" aria-label="${hidden ? `Mostrar ${esc(c.name)}` : `Esconder ${esc(c.name)}`}" aria-pressed="${hidden}">${I.HIDE}</button>`
     + `<button type="button" class="logs-btn" data-logs="${esc(c.id)}" data-name="${esc(c.name)}" title="Ver logs" aria-label="Ver logs de ${esc(c.name)}">${I.LOGS}</button>`
-    + `</div>${usageCell(c)}</div>`;
+    + `</div><div class="ct-cell" role="cell">${usageCell(c)}</div></div>`;
 }
 
 function stackBtn(stack: StackBlock, action: string, title: string, icon: string, extra = ""): string {
@@ -319,11 +347,15 @@ function renderStack(stack: StackBlock, s: ViewState, showStackHide: boolean, se
   const key = stackKey(stack);
   const running = stack.containers.some((c) => isContainerRunning(c.status));
   const rowPrefix = `${section}-${key}`;
+  const widths = columnWidthsFromPrefs(s.prefs);
   const rows = stack.containers.map((c) => renderRow(c, s, rowPrefix)).join("");
   let head = "";
   if (stack.showTitle) {
     const nameLabel = stack.isFavorites ? "Favoritos" : esc(stack.name);
-    head = `<div class="stack-head"><span class="stack-name${stack.isFavorites ? " stack-name-icon" : ""}" title="${nameLabel}" aria-label="${nameLabel}">${stack.isFavorites ? I.STAR : esc(stack.name)}</span>`
+    const swarmBadge = stack.isSwarm
+      ? `<span data-slot="badge" data-variant="outline" class="${UI.BADGE_OUTLINE} stack-swarm-badge" title="Docker Swarm">Swarm</span>`
+      : "";
+    head = `<div class="stack-head"><span class="stack-title"><span class="stack-name${stack.isFavorites ? " stack-name-icon" : ""}" title="${nameLabel}" aria-label="${nameLabel}">${stack.isFavorites ? I.STAR : esc(stack.name)}</span>${swarmBadge}</span>`
       + `<div class="stack-meta"><span class="stack-count">${stack.count}</span>`
       + `<button type="button" class="stack-collapse-btn" data-collapse-stack="${esc(key)}" title="${collapsed ? "Expandir stack" : "Comprimir stack"}" aria-label="${collapsed ? "Expandir" : "Comprimir"} stack ${esc(stack.name)}" aria-expanded="${!collapsed}">${collapsed ? I.CHEVRON_DOWN : I.CHEVRON_UP}</button>`
       + (showStackHide && !stack.isFavorites
@@ -339,7 +371,10 @@ function renderStack(stack: StackBlock, s: ViewState, showStackHide: boolean, se
         : "")
       + `</div></div>`;
   }
-  const body = stack.showTitle ? `<div class="stack-body"${collapsed ? " hidden" : ""}>${rows}</div>` : rows;
+  const table = wrapContainerTable(rows, widths);
+  const scrollWrap = (inner: string, extraClass = "") =>
+    `<div class="container-table-scroll${extraClass ? ` ${extraClass}` : ""}">${inner}</div>`;
+  const body = scrollWrap(table, `stack-body${stack.showTitle && collapsed ? " hidden" : ""}`);
   return `<div class="stack-block${collapsed ? " is-collapsed" : ""}" id="${section}-s-${esc(key)}">${head}${body}</div>`;
 }
 
@@ -367,10 +402,11 @@ function renderContainers(s: ViewState): string {
   const showHiddenList = !lists.flat && prefs.view.showHidden && (lists.hiddenStacks?.length ?? 0) > 0;
   const showEmpty = !hasVisible && !showHiddenList;
 
+  const widths = columnWidthsFromPrefs(prefs);
   let stacks = "";
   if (hasVisible) {
     stacks = lists.flat
-      ? `<div class="flat-list">${(lists.flatRows ?? []).map((c: ContainerRow) => renderRow(decorate(c), s, "flat")).join("")}</div>`
+      ? `<div class="flat-list stack-body container-table-scroll">${wrapContainerTable((lists.flatRows ?? []).map((c: ContainerRow) => renderRow(decorate(c), s, "flat")).join(""), widths)}</div>`
       : (lists.visibleStacks ?? []).map((st) => renderStack(st, s, true, "v")).join("");
   }
   const hidden = showHiddenList ? (lists.hiddenStacks ?? []).map((st) => renderStack(st, s, true, "h")).join("") : "";

@@ -5,6 +5,7 @@ export type ContainerRow = {
   status: string;
   ports: number[];
   stack: string;
+  stackKind?: "" | "compose" | "swarm";
   health: string | null;
   cpuPct?: number | null;
   memPct?: number | null;
@@ -66,6 +67,7 @@ export type Settings = {
   compactView: boolean;
   truncateNames: boolean;
   verticalMeters: boolean;
+  containerColumnWidths?: number[];
 };
 
 export type Prefs = {
